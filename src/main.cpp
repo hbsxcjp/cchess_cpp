@@ -19,15 +19,15 @@ int main(int argc, char const* argv[])
 
         auto time0 = steady_clock::now();
 
+        string fname = "a.txt";
         /* 
-        string fname = "board.txt";
         wofstream ofs(fname);
         ofs << testBoard() << flush;
         ofs.close();
         //*/
-        //Tools::writeFile(fname, testBoard());
         std::wcout << testBoard();
         //std::wcout << testChessmanual();
+        //Tools::writeFile(fname, testChessmanual());
         /*
         if (argc == 7)
             testTransDir(std::stoi(argv[1]), std::stoi(argv[2]),

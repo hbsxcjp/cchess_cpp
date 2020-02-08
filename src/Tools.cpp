@@ -38,6 +38,30 @@ StrType trim(const StrType& str)
     return str.substr(first, last - first);
 }
 
+//string中的UTF-8字节流转换成UTF-16并保存在std::wstring中
+wstring s2ws(const string& s)
+{
+    const char* str = s.c_str();
+    size_t len = s.size() + 1;
+    wchar_t* wstr = new wchar_t[len];
+    mbstowcs(wstr, str, len);
+    wstring ret(wstr);
+    delete[] wstr;
+    return ret;
+}
+
+//wstring转换到std::string
+string ws2s(const wstring& ws)
+{
+    const wchar_t* wstr = ws.c_str();
+    size_t len = 2 * ws.size() + 1;
+    char* str = new char[len];
+    wcstombs(str, wstr, len);
+    string ret(str);
+    delete[] str;
+    return ret;
+}
+
 const string getExtStr(const string& filename)
 {
     string ext{ filename.substr(filename.rfind('.')) };

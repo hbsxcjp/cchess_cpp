@@ -50,42 +50,60 @@ bool Board::isDied(PieceColor color) const
     return true;
 }
 
-inline SSeat_pair Board::getSeatPair(int frow, int fcol, int trow, int tcol) const
+PRowCol_pair Board::getPRowCol_pair(const wstring& str, RecFormat fmt) const
 {
-    return make_pair(seats_->getSeat(frow, fcol), seats_->getSeat(trow, tcol));
+    assert(str.size() == 4);
+    SSeat fseat, tseat;
+    if (fmt == RecFormat::PGN_ICCS) {
+        fseat = seats_->getSeat(PieceManager::getColFromICCSChar(str[1]), PieceManager::getColFromICCSChar(str[0]));
+        tseat = seats_->getSeat(PieceManager::getColFromICCSChar(str[3]), PieceManager::getColFromICCSChar(str[2]));
+    } else { // RecFormat::PGN_ZH, RecFormat::PGN_CC
+        SSeat_vector seats{};
+        // 根据最后一个字符判断该着法属于哪一方
+        PieceColor color{ PieceManager::getColorFromZh(str.back()) };
+        bool isBottom{ isBottomSide(color) };
+        int index{}, movDir{ PieceManager::getMovNum(isBottom, str.at(2)) };
+        wchar_t name{ str.front() };
+
+        if (PieceManager::isPiece(name)) { // 首字符为棋子名
+            seats = seats_->getLiveSeats(color, name,
+                PieceManager::getCurIndex(isBottom,
+                    PieceManager::getNumIndex(color, str.at(1)), BOARDCOLNUM));
+            assert(seats.size() > 0);
+            //# 排除：士、象同列时不分前后，以进、退区分棋子。移动方向为退时，修正index
+            index = (seats.size() == 2 && movDir == -1) ? 1 : 0; //&& isAdvBish(name)
+        } else {
+            name = str.at(1);
+            seats = (PieceManager::isPawn(name)
+                    ? seats_->getSortPawnLiveSeats(isBottom, color, name)
+                    : seats_->getLiveSeats(color, name));
+            index = PieceManager::getPreIndex(seats.size(), isBottom, str.front());
+        }
+
+        assert(index <= static_cast<int>(seats.size()) - 1);
+        fseat = seats.at(index);
+
+        int numIndex{ PieceManager::getNumIndex(color, str.back()) },
+            toCol{ PieceManager::getCurIndex(isBottom, numIndex, BOARDCOLNUM) };
+        if (PieceManager::isLineMove(name)) {
+            int trow{ fseat->row() + movDir * (numIndex + 1) };
+            tseat = movDir == 0 ? seats_->getSeat(fseat->row(), toCol) : seats_->getSeat(trow, fseat->col());
+        } else { // 斜线走子：仕、相、马
+            int colAway{ abs(toCol - fseat->col()) }, //  相距1或2列
+                trow{ fseat->row()
+                    + movDir * ((PieceManager::isAdvisor(name) || PieceManager::isBishop(name)) ? colAway : (colAway == 1 ? 2 : 1)) };
+            tseat = seats_->getSeat(trow, toCol);
+        }
+    }
+    //assert(str == getZh(make_pair(fseat->rowCol_pair(), tseat->rowCol_pair())));
+    return make_pair(fseat->rowCol_pair(), tseat->rowCol_pair());
 }
 
-SSeat_pair Board::getSeatPair(int frowcol, int trowcol) const // 内联不成功
-{
-    return make_pair(seats_->getSeat(frowcol), seats_->getSeat(trowcol));
-}
-
-inline SSeat_pair Board::getSeatPair(RowCol_pair fprow_pair, RowCol_pair tprow_pair) const
-{
-    return make_pair(seats_->getSeat(fprow_pair), seats_->getSeat(tprow_pair));
-}
-
-inline SSeat_pair Board::getSeatPair(PRowCol_pair pprow_pair) const
-{
-    return getSeatPair(pprow_pair.first, pprow_pair.second);
-}
-
-SSeat_pair Board::getSeatPair(const wstring& str, RecFormat fmt) const
-{
-    return ((fmt == RecFormat::PGN_ZH || fmt == RecFormat::PGN_CC)
-            ? __getSeatPairFromZhStr(str)
-            : getSeatPair(
-                  PieceManager::getRowFromICCSChar(str.at(1)),
-                  PieceManager::getColFromICCSChar(str.at(0)),
-                  PieceManager::getRowFromICCSChar(str.at(3)),
-                  PieceManager::getColFromICCSChar(str.at(2))));
-}
-
-//(fseat, tseat)->中文纵线着法
-const wstring Board::getZhStr(SSeat_pair seat_pair) const
+//中文纵线着法
+const wstring Board::getZhStr(PRowCol_pair prowcol_pair) const
 {
     wostringstream wos{};
-    auto &fseat = seat_pair.first, &tseat = seat_pair.second;
+    auto &fseat = seats_->getSeat(prowcol_pair.first), &tseat = seats_->getSeat(prowcol_pair.second);
     const SPiece& fromPiece{ fseat->piece() };
     PieceColor color{ fromPiece->color() };
     wchar_t name{ fromPiece->name() };
@@ -107,22 +125,34 @@ const wstring Board::getZhStr(SSeat_pair seat_pair) const
                    ? PieceManager::getNumChar(color, abs(fromRow - toRow)) // 非同一行
                    : PieceManager::getColChar(color, isBottom, toCol));
 
-    //assert(__getSeatPairFromZhStr(wos.str()) == seat_pair);
+    //assert(getPRowCol_pair(wos.str()) == prowcol_pair);
 
     return wos.str();
 }
 
-template <typename From_T1, typename From_T2>
-const RowCol_pair_vector Board::getCanMoveRowCols(From_T1 arg1, From_T2 arg2) const
+const RowCol_pair_vector Board::getPutRowCols(const SPiece& piece) const
 {
-    return SeatManager::getRowCols(__getCanMoveSeats(__getSeat(arg1, arg2)));
+    return SeatManager::getRowCols(seats_->getPutSeats(isBottomSide(piece->color()), piece));
 }
-template const RowCol_pair_vector Board::getCanMoveRowCols(int arg1, int arg2) const;
-template const RowCol_pair_vector Board::getCanMoveRowCols(const wstring& arg1, RecFormat arg2) const;
+
+const RowCol_pair_vector Board::getCanMoveRowCols(RowCol_pair rowcol_pair) const
+{
+    return SeatManager::getRowCols(__getCanMoveSeats(seats_->getSeat(rowcol_pair)));
+}
 
 const RowCol_pair_vector Board::getLiveRowCols(PieceColor color) const
 {
     return SeatManager::getRowCols(seats_->getLiveSeats(color));
+}
+
+const SPiece& Board::doneMove(PRowCol_pair prowcol_pair) const
+{
+    return seats_->getSeat(prowcol_pair.first)->movTo(seats_->getSeat(prowcol_pair.second));
+}
+
+void Board::undoMove(PRowCol_pair prowcol_pair, const SPiece& eatPie) const
+{
+    seats_->getSeat(prowcol_pair.second)->movTo(seats_->getSeat(prowcol_pair.first), eatPie);
 }
 
 void Board::setPieces(const wstring& pieceChars)
@@ -181,83 +211,20 @@ const wstring Board::toString() const
 
 void Board::__setBottomSide()
 {
-    //auto kseat = pieces_->getKingPiece(PieceColor::RED)->seat();
-    //assert(kseat);
     bottomColor_ = seats_->getKingSeat(true)->piece()->color();
 }
 
-const SSeat& Board::__getSeat(int row, int col) const
-{
-    return seats_->getSeat(row, col);
-}
-
-const SSeat& Board::__getSeat(const wstring& str, RecFormat fmt) const
-{
-    return ((fmt == RecFormat::PGN_ZH || fmt == RecFormat::PGN_CC)
-            ? __getSeatPairFromZhStr(str).first
-            : seats_->getSeat(
-                  PieceManager::getRowFromICCSChar(str.at(1)),
-                  PieceManager::getColFromICCSChar(str.at(0))));
-}
-
-SSeat_pair Board::__getSeatPairFromZhStr(const wstring& zhStr) const
-{
-    assert(zhStr.size() == 4);
-    SSeat fseat{}, tseat{};
-    SSeat_vector seats{};
-    // 根据最后一个字符判断该着法属于哪一方
-    PieceColor color{ PieceManager::getColorFromZh(zhStr.back()) };
-    bool isBottom{ isBottomSide(color) };
-    int index{}, movDir{ PieceManager::getMovNum(isBottom, zhStr.at(2)) };
-    wchar_t name{ zhStr.front() };
-
-    if (PieceManager::isPiece(name)) { // 首字符为棋子名
-        seats = seats_->getLiveSeats(color, name,
-            PieceManager::getCurIndex(isBottom,
-                PieceManager::getNumIndex(color, zhStr.at(1)), BOARDCOLNUM));
-        assert(seats.size() > 0);
-        //# 排除：士、象同列时不分前后，以进、退区分棋子。移动方向为退时，修正index
-        index = (seats.size() == 2 && movDir == -1) ? 1 : 0; //&& isAdvBish(name)
-    } else {
-        name = zhStr.at(1);
-        seats = (PieceManager::isPawn(name)
-                ? seats_->getSortPawnLiveSeats(isBottom, color, name)
-                : seats_->getLiveSeats(color, name));
-        index = PieceManager::getPreIndex(seats.size(), isBottom, zhStr.front());
-    }
-
-    assert(index <= static_cast<int>(seats.size()) - 1);
-    fseat = seats.at(index);
-
-    int numIndex{ PieceManager::getNumIndex(color, zhStr.back()) },
-        toCol{ PieceManager::getCurIndex(isBottom, numIndex, BOARDCOLNUM) };
-    if (PieceManager::isLineMove(name)) {
-        int trow{ fseat->row() + movDir * (numIndex + 1) };
-        tseat = movDir == 0 ? seats_->getSeat(fseat->row(), toCol) : seats_->getSeat(trow, fseat->col());
-    } else { // 斜线走子：仕、相、马
-        int colAway{ abs(toCol - fseat->col()) }, //  相距1或2列
-            trow{ fseat->row()
-                + movDir * ((PieceManager::isAdvisor(name) || PieceManager::isBishop(name)) ? colAway : (colAway == 1 ? 2 : 1)) };
-        tseat = seats_->getSeat(trow, toCol);
-    }
-    //assert(zhStr == getZh(fseat, tseat));
-
-    return make_pair(fseat, tseat);
-}
-
-SSeat_vector Board::__getCanMoveSeats(const SSeat& fseat) const
+SSeat_vector Board::__getCanMoveSeats(SSeat fseat) const
 {
     assert(fseat->piece());
     PieceColor color{ fseat->piece()->color() };
-    //SPiece toPiece;
     auto seats = seats_->getMoveSeats(isBottomSide(color), fseat);
-    auto fseat_cp = fseat; // 新建一个非const的副本，供下面测试是否被将军使用 (参见:c++ Primer Page.192)
     auto pos = remove_if(seats.begin(), seats.end(),
         [&](SSeat& tseat) {
             // 移动棋子后，检测是否会被对方将军
-            auto& eatPiece = fseat_cp->movTo(tseat);
+            auto& eatPiece = fseat->movTo(tseat);
             bool killed{ isKilled(color) };
-            tseat->movTo(fseat_cp, eatPiece);
+            tseat->movTo(fseat, eatPiece);
             return killed;
         });
     return SSeat_vector{ seats.begin(), pos };
@@ -383,9 +350,9 @@ const wstring testBoard()
                 auto rowcols = board.getLiveRowCols(color);
                 wos << L"isBottomSide: " << boolalpha << board.isBottomSide(color) << L'\n'
                     << getRowColsStr(rowcols) << L'\n';
-                for (auto& rowcol : rowcols)
-                    wos << L"From:" << rowcol.first << rowcol.second << L" CanMovtTo: "
-                        << getRowColsStr(board.getCanMoveRowCols(rowcol.first, rowcol.second))
+                for (auto& rowcol_pair : rowcols)
+                    wos << L"From:" << rowcol_pair.first << rowcol_pair.second << L" CanMovtTo: "
+                        << getRowColsStr(board.getCanMoveRowCols(rowcol_pair))
                         << L'\n';
                 wos << L'\n';
             }

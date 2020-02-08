@@ -16,9 +16,9 @@ bool Seat::isSameColor(const SSeat& seat) const
     return piece && piece->color() == piece_->color();
 }
 
-const SPiece Seat::movTo(SSeat& tseat, const SPiece& eatPiece)
+const SPiece& Seat::movTo(const SSeat& tseat, const SPiece& eatPiece) const
 {
-    auto tpiece = tseat->piece();
+    auto& tpiece = tseat->piece();
     tseat->setPiece(this->piece());
     setPiece(eatPiece);
     return tpiece;
@@ -44,11 +44,6 @@ inline const SSeat& Seats::getSeat(int row, int col) const
     return allSeats_.at(SeatManager::getIndex_rc(row, col));
 }
 
-inline const SSeat& Seats::getSeat(int rowcol) const
-{
-    return allSeats_.at(SeatManager::getIndex_rc(rowcol));
-}
-
 inline const SSeat& Seats::getSeat(RowCol_pair rowcol_pair) const
 {
     return getSeat(rowcol_pair.first, rowcol_pair.second);
@@ -56,8 +51,8 @@ inline const SSeat& Seats::getSeat(RowCol_pair rowcol_pair) const
 
 const SSeat& Seats::getKingSeat(bool isBottom) const
 {
-    for (auto& rowcol : SeatManager::getKingRowcols(isBottom)) {
-        auto& seat = getSeat(rowcol);
+    for (auto& rowcol_pair : SeatManager::getKingRowcols(isBottom)) {
+        auto& seat = getSeat(rowcol_pair);
         auto& piece = seat->piece();
         if (piece && PieceManager::isKing(piece->name()))
             return seat;
@@ -157,7 +152,7 @@ void Seats::changeSide(const ChangeType ct, const shared_ptr<Pieces>& pieces)
         [&](const SSeat& seat) {
             boardPieces.push_back(ct == ChangeType::EXCHANGE
                     ? pieces->getOtherPiece(seat->piece())
-                    : getSeat(changeRowcol(seat->rowcol()))->piece());
+                    : getSeat(changeRowcol(seat->rowCol_pair()))->piece());
         });
     setBoardPieces(boardPieces);
 }

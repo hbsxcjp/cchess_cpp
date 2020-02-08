@@ -17,6 +17,9 @@ namespace Tools {
 template <typename StrType>
 StrType trim(const StrType& str);
 
+std::wstring s2ws(const std::string& s);
+std::string ws2s(const std::wstring& ws);
+
 const std::string getExtStr(const std::string& filename);
 
 const std::wstring getWString(std::wistream& wis);

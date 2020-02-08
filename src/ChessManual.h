@@ -9,10 +9,9 @@ namespace ChessManualSpace {
 
 class ChessManual {
     class Move;
+    typedef shared_ptr<ChessManual::Move> SMove;
 
 private:
-    typedef shared_ptr<Move> SMove;
-
     // 着法节点类
     class Move : public enable_shared_from_this<Move> {
     public:
@@ -20,7 +19,7 @@ private:
 
         int frowcol() const;
         int trowcol() const;
-        SSeat_pair getSeat_pair() const { return seat_pair_; }
+        PRowCol_pair getPRowCol_pair() const { return prowcol_pair_; }
         const wstring iccs() const;
         const wstring zh() const { return zhStr_; }
         const wstring& remark() const { return remark_; }
@@ -30,21 +29,17 @@ private:
         const SMove prev() const { return prev_.lock(); }
 
         SMove& addNext();
-        SMove& addOther(); 
-        SMove& addNext(const SSeat_pair& seat_pair, const wstring& remark);
-        SMove& addOther(const SSeat_pair& seat_pair, const wstring& remark);
+        SMove& addOther();
+        SMove& addNext(const PRowCol_pair& prowcol_pair, const wstring& remark);
+        SMove& addOther(const PRowCol_pair& prowcol_pair, const wstring& remark);
 
-        void setSeatPairRemark(const SSeat_pair& seat_pair, const wstring& remark);
-        void setSeatPair(const SSeat_pair& seat_pair) { seat_pair_ = seat_pair; }
-        void setRemark(const wstring& remark) { 
-            remark_ = remark; 
-            }
+        void setPRowCol_pair(const PRowCol_pair& prowcol_pair) { prowcol_pair_ = prowcol_pair; }
+        void setEatPie(const SPiece& eatPie) { eatPie_ = eatPie; }
+        void setRemark(const wstring& remark) { remark_ = remark; }
         void setPrev(const weak_ptr<Move>& prev) { prev_ = prev; }
         void setZhStr(const wstring& zhStr) { zhStr_ = zhStr; }
 
         vector<SMove> getPrevMoves();
-        void done();
-        void undo();
 
         void cutNext() { next_ = nullptr; }
         void cutOther() { other_ && (other_ = other_->other_); }
@@ -60,7 +55,7 @@ private:
         void setCC_ColNo(int CC_ColNo) { CC_ColNo_ = CC_ColNo; }
 
     private:
-        pair<SSeat, SSeat> seat_pair_{};
+        PRowCol_pair prowcol_pair_{};
         wstring remark_{}; // 注释
         weak_ptr<Move> prev_{};
 
@@ -72,11 +67,10 @@ private:
     };
 
 public:
-    ChessManual();
-    ChessManual(const string& infilename);
+    ChessManual(const string& infilename = nullptr);
 
-    SMove& addNextMove(SMove& move, int frowcol, int trowcol, const wstring& remark) const;
-    SMove& addOtherMove(SMove& move, int frowcol, int trowcol, const wstring& remark) const;
+    SMove& addNextMove(SMove& move, int frow, int fcol, int trow, int tcol, const wstring& remark) const;
+    SMove& addOtherMove(SMove& move, int frow, int fcol, int trow, int tcol, const wstring& remark) const;
     SMove& addNextMove(SMove& move, const wstring& str, RecFormat fmt, const wstring& remark) const;
     SMove& addOtherMove(SMove& move, const wstring& str, RecFormat fmt, const wstring& remark) const;
 
@@ -84,6 +78,8 @@ public:
     void read(const string& infilename);
     void write(const string& outfilename);
 
+    void done(SMove move);
+    void undo(SMove move);
     void go();
     void back();
     void backTo(const SMove& move);
@@ -128,16 +124,15 @@ private:
     void __writeMove_PGN_CC(wostream& wos) const;
 
     map<wstring, wstring> info_;
-    shared_ptr<Board> board_;
+    SBoard board_;
     SMove rootMove_, currentMove_;
     int movCount_{ 0 }, remCount_{ 0 }, remLenMax_{ 0 }, maxRow_{ 0 }, maxCol_{ 0 };
 };
- 
+
 void transDir(const string& dirfrom, const RecFormat fmt);
 void testTransDir(int fd, int td, int ff, int ft, int tf, int tt);
 
 const wstring testChessmanual();
-
 }
 
 #endif

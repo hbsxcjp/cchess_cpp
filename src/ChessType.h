@@ -46,6 +46,19 @@ using namespace SeatSpace;
 using namespace BoardSpace;
 using namespace ChessManualSpace;
 
+typedef shared_ptr<Piece> SPiece;
+
+typedef shared_ptr<Seat> SSeat;
+typedef vector<SSeat> SSeat_vector;
+
+typedef pair<int, int> RowCol_pair;
+typedef pair<pair<int, int>, pair<int, int>> PRowCol_pair;
+typedef vector<RowCol_pair> RowCol_pair_vector;
+typedef vector<PRowCol_pair> PRowCol_pair_vector;
+
+typedef shared_ptr<Board> SBoard;
+typedef shared_ptr<ChessManual> SChessManual;
+
 enum class PieceColor {
     RED,
     BLACK
@@ -75,20 +88,6 @@ enum class RecFormat {
     PGN_ZH,
     PGN_CC
 };
-
-typedef shared_ptr<PieceSpace::Piece> SPiece;
-
-typedef shared_ptr<SeatSpace::Seat> SSeat;
-typedef pair<const SSeat&, const SSeat&> SSeat_pair;
-typedef vector<SSeat> SSeat_vector;
-
-typedef pair<int, int> RowCol_pair;
-typedef pair<pair<int, int>, pair<int, int>> PRowCol_pair;
-typedef vector<RowCol_pair> RowCol_pair_vector;
-typedef vector<PRowCol_pair> PRowCol_pair_vector;
-
-typedef shared_ptr<BoardSpace::Board> SBoard;
-typedef shared_ptr<ChessManualSpace::ChessManual> SChessManual;
 
 constexpr auto BLANKNAME = L'\x0';
 constexpr auto BLANKCOL = -1;

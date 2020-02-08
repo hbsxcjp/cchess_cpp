@@ -14,18 +14,18 @@ public:
 
     int row() const { return row_; }
     int col() const { return col_; }
-    int rowcol() const { return row_ * 10 + col_; }
+    RowCol_pair rowCol_pair() { return make_pair(row_, col_); }
     const SPiece& piece() const { return piece_; }
 
     bool isSameColor(const SSeat& seat) const;
-    void setPiece(const SPiece& piece = nullptr) { piece_ = piece; }
-    const SPiece movTo(SSeat& tseat, const SPiece& eatPiece = nullptr);
+    void setPiece(const SPiece& piece = nullptr) const { piece_ = piece; }
+    const SPiece& movTo(const SSeat& tseat, const SPiece& eatPiece = nullptr) const;
 
     const wstring toString() const;
 
 private:
     const int row_, col_;
-    SPiece piece_{};
+    mutable SPiece piece_{};
 };
 
 // 棋盘位置类
@@ -34,7 +34,6 @@ public:
     Seats();
 
     const SSeat& getSeat(int row, int col) const;
-    const SSeat& getSeat(int rowcol) const;
     const SSeat& getSeat(RowCol_pair rowcol_pair) const;
 
     const SSeat& getKingSeat(bool isBottom) const;
@@ -85,11 +84,12 @@ class SeatManager {
 public:
     static bool isBottom(int row) { return row < RowLowUpIndex_; };
     static int getIndex_rc(int row, int col) { return row * BOARDCOLNUM + col; }
-    static int getIndex_rc(int rowcol) { return getIndex_rc(rowcol / 10, rowcol % 10); }
-    static int getRotate(int rowcol) { return (BOARDROWNUM - rowcol / 10 - 1) * 10 + (BOARDCOLNUM - rowcol % 10 - 1); }
-    static int getSymmetry(int rowcol) { return rowcol + BOARDCOLNUM - rowcol % 10 * 2 - 1; }
+    static int getRowCol(RowCol_pair rowcol_pair) { return rowcol_pair.first * 10 + rowcol_pair.second; }
+    static RowCol_pair getRowCol_pair(int rowcol) { return make_pair(rowcol / 10, rowcol % 10); }
+    static RowCol_pair getRotate(RowCol_pair rowcol_pair) { return make_pair(BOARDROWNUM - 1 - rowcol_pair.first, BOARDCOLNUM - 1 - rowcol_pair.second); }
+    static RowCol_pair getSymmetry(RowCol_pair rowcol_pair) { return make_pair(rowcol_pair.first, BOARDCOLNUM - 1 - rowcol_pair.second); }
 
-    static void movBack(SSeat& fseat, SSeat& tseat, const SPiece& eatPiece);
+    //static void movBack(SSeat& fseat, SSeat& tseat, const SPiece& eatPiece);
 
     static const RowCol_pair_vector getRowCols(const SSeat_vector& seats);
 
