@@ -97,4 +97,5 @@ constexpr auto BOARDROWNUM = 10;
 constexpr auto BOARDCOLNUM = 9;
 constexpr auto SEATNUM = BOARDROWNUM * BOARDCOLNUM;
 
+
 #endif

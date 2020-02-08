@@ -494,15 +494,15 @@ void ChessManual::__readXQF(istream& is)
         { L"Version", to_wstring(Version) },
         { L"Result", (map<unsigned char, wstring>{ { 0, L"未知" }, { 1, L"红胜" }, { 2, L"黑胜" }, { 3, L"和棋" } })[headPlayResult] },
         { L"PlayType", (map<unsigned char, wstring>{ { 0, L"全局" }, { 1, L"开局" }, { 2, L"中局" }, { 3, L"残局" } })[headCodeA_H[0]] },
-        { L"TitleA", Tools::cvt.from_bytes(TitleA) },
-        { L"Event", Tools::cvt.from_bytes(Event) },
-        { L"Date", Tools::cvt.from_bytes(Date) },
-        { L"Site", Tools::cvt.from_bytes(Site) },
-        { L"Red", Tools::cvt.from_bytes(Red) },
-        { L"Black", Tools::cvt.from_bytes(Black) },
-        { L"Opening", Tools::cvt.from_bytes(Opening) },
-        { L"RMKWriter", Tools::cvt.from_bytes(RMKWriter) },
-        { L"Author", Tools::cvt.from_bytes(Author) },
+        { L"TitleA", wscvt.from_bytes(TitleA) },
+        { L"Event", wscvt.from_bytes(Event) },
+        { L"Date", wscvt.from_bytes(Date) },
+        { L"Site", wscvt.from_bytes(Site) },
+        { L"Red", wscvt.from_bytes(Red) },
+        { L"Black", wscvt.from_bytes(Black) },
+        { L"Opening", wscvt.from_bytes(Opening) },
+        { L"RMKWriter", wscvt.from_bytes(RMKWriter) },
+        { L"Author", wscvt.from_bytes(Author) },
         { FENKey, pieCharsToFEN(pieceChars) } // 可能存在不是红棋先走的情况？在readMove后再更新一下！
     };
     //__setFENplusFromPieChars(pieceChars, rootMove_->getSeat_pair().first->piece()->color());
@@ -545,7 +545,7 @@ void ChessManual::__readXQF(istream& is)
         if (RemarkSize > 0) { // # 如果有注解
             char* rem = new char[RemarkSize + 1]();
             __readBytes(rem, RemarkSize);
-            wstr = Tools::cvt.from_bytes(rem);
+            wstr = wscvt.from_bytes(rem);
             delete[] rem;
         }
         return wstr;
@@ -583,7 +583,7 @@ void ChessManual::__readBIN(istream& is)
         wstring wstr{};
         char* rem = new char[length + 1]();
         is.read(rem, length);
-        wstr = Tools::cvt.from_bytes(rem);
+        wstr = wscvt.from_bytes(rem);
         delete[] rem;
         return wstr;
     };
@@ -625,7 +625,7 @@ void ChessManual::__readBIN(istream& is)
 void ChessManual::__writeBIN(ostream& os) const
 {
     auto __writeWstring = [&](const wstring& wstr) {
-        string str{ Tools::cvt.to_bytes(wstr) };
+        string str{ wscvt.to_bytes(wstr) };
         int len = str.size();
         os.write((char*)&len, sizeof(int)).write(str.c_str(), len);
     };
@@ -672,14 +672,14 @@ void ChessManual::__readJSON(istream& is)
 
     Json::Value infoItem{ root["info"] };
     for (auto& key : infoItem.getMemberNames())
-        info_[Tools::cvt.from_bytes(key)] = Tools::cvt.from_bytes(infoItem[key].asString());
+        info_[wscvt.from_bytes(key)] = wscvt.from_bytes(infoItem[key].asString());
     __setBoardFromInfo();
 
     function<void(const SMove&, Json::Value&)>
         __readMove = [&](const SMove& move, Json::Value& item) {
             int frowcol{ item["f"].asInt() }, trowcol{ item["t"].asInt() };
             __setMoveFromRowcol(move, frowcol, trowcol,
-                (item.isMember("r")) ? Tools::cvt.from_bytes(item["r"].asString()) : wstring{});
+                (item.isMember("r")) ? wscvt.from_bytes(item["r"].asString()) : wstring{});
 
             if (item.isMember("n"))
                 __readMove(move->addNext(), item["n"]);
@@ -687,7 +687,7 @@ void ChessManual::__readJSON(istream& is)
                 __readMove(move->addOther(), item["o"]);
         };
 
-    rootMove_->setRemark(Tools::cvt.from_bytes(root["remark"].asString()));
+    rootMove_->setRemark(wscvt.from_bytes(root["remark"].asString()));
     Json::Value rootItem{ root["moves"] };
     if (!rootItem.isNull())
         __readMove(rootMove_->addNext(), rootItem);
@@ -700,7 +700,7 @@ void ChessManual::__writeJSON(ostream& os) const
     unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
     for_each(info_.begin(), info_.end(),
         [&](const pair<wstring, wstring>& kv) {
-            infoItem[Tools::cvt.to_bytes(kv.first)] = Tools::cvt.to_bytes(kv.second);
+            infoItem[wscvt.to_bytes(kv.first)] = wscvt.to_bytes(kv.second);
         });
     root["info"] = infoItem;
     function<Json::Value(const SMove&)>
@@ -709,14 +709,14 @@ void ChessManual::__writeJSON(ostream& os) const
             item["f"] = move->frowcol();
             item["t"] = move->trowcol();
             if (!move->remark().empty())
-                item["r"] = Tools::cvt.to_bytes(move->remark());
+                item["r"] = wscvt.to_bytes(move->remark());
             if (move->next())
                 item["n"] = __writeItem(move->next());
             if (move->other())
                 item["o"] = __writeItem(move->other());
             return item;
         };
-    root["remark"] = Tools::cvt.to_bytes(rootMove_->remark());
+    root["remark"] = wscvt.to_bytes(rootMove_->remark());
     if (rootMove_->next())
         root["moves"] = __writeItem(rootMove_->next());
     writer->write(root, &os);

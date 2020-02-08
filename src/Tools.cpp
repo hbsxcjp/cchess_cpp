@@ -9,9 +9,10 @@
 
 using namespace std;
 
+wstring_convert<codecvt_utf8<wchar_t>> wscvt;
+
 namespace Tools {
 
-wstring_convert<codecvt<wchar_t, char, mbstate_t>> cvt{};
 
 template <typename StrType>
 StrType trim(const StrType& str)

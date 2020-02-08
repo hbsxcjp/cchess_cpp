@@ -2,6 +2,7 @@
 #ifndef TOOLS_H
 #define TOOLS_H
 
+#include <codecvt>
 #include <locale>
 #include <map>
 #include <string>
@@ -9,9 +10,9 @@
 
 using namespace std;
 
-namespace Tools {
+extern wstring_convert<codecvt_utf8<wchar_t>> wscvt;
 
-extern wstring_convert<codecvt<wchar_t, char, mbstate_t>> cvt;
+namespace Tools {
 
 template <typename StrType>
 StrType trim(const StrType& str);
@@ -23,12 +24,11 @@ const std::wstring getWString(std::wistream& wis);
 std::wstring readFile(const std::string& fileName);
 
 void writeFile(const std::string& fileName, const std::wstring& ws);
- 
+
 void getFiles(const std::string& path, std::vector<std::string>& files);
 
 int copyFile(const char* sourceFile, const char* newFile);
 
-// ²âÊÔº¯Êý
 const std::wstring test();
 
 } //
