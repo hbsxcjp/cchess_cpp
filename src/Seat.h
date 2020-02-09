@@ -19,7 +19,7 @@ public:
 
     bool isSameColor(const SSeat& seat) const;
     void setPiece(const SPiece& piece = nullptr) const { piece_ = piece; }
-    const SPiece& movTo(const SSeat& tseat, const SPiece& eatPiece = nullptr) const;
+    const SPiece movTo(const SSeat& tseat, const SPiece& eatPiece = nullptr) const;
 
     const wstring toString() const;
 
@@ -39,14 +39,14 @@ public:
     const SSeat& getKingSeat(bool isBottom) const;
 
     // 棋子可放置的位置
-    SSeat_vector getPutSeats(bool isBottom, const SPiece& piece) const;
+    RowCol_pair_vector getPutRowCols(bool isBottom, const SPiece& piece) const;
     // 某位置棋子可移动的位置（未排除被将军的情况）
-    SSeat_vector getMoveSeats(bool isBottom, const SSeat& fseat) const;
+    RowCol_pair_vector getMoveRowCols(bool isBottom, const RowCol_pair& rowcol_pair) const;
     // 取得棋盘上活的棋子
-    SSeat_vector getLiveSeats(PieceColor color, wchar_t name = BLANKNAME,
+    RowCol_pair_vector getLiveRowCols(PieceColor color, wchar_t name = BLANKNAME,
         int col = BLANKCOL, bool getStronge = false) const;
     // '多兵排序'
-    SSeat_vector getSortPawnLiveSeats(bool isBottom, PieceColor color, wchar_t name) const;
+    RowCol_pair_vector getSortPawnLiveRowCols(bool isBottom, PieceColor color, wchar_t name) const;
 
     void setBoardPieces(const vector<SPiece>& boardPieces);
     void changeSide(const ChangeType ct, const shared_ptr<PieceSpace::Pieces>& pieces);
@@ -56,27 +56,21 @@ public:
 private:
     SSeat_vector allSeats_{};
 
-    SSeat_vector getAllSeats() const;
-    SSeat_vector getKingSeats(bool isBottom) const;
-    SSeat_vector getAdvisorSeats(bool isBottom) const;
-    SSeat_vector getBishopSeats(bool isBottom) const;
-    SSeat_vector getPawnSeats(bool isBottom) const;
-
-    SSeat_vector getKingMoveSeats(bool isBottom, const SSeat& fseat) const;
-    SSeat_vector getAdvisorMoveSeats(bool isBottom, const SSeat& fseat) const;
-    SSeat_vector getBishopMoveSeats(bool isBottom, const SSeat& fseat) const;
-    SSeat_vector getKnightMoveSeats(bool isBottom, const SSeat& fseat) const;
-    SSeat_vector getRookMoveSeats(const SSeat& fseat) const;
-    SSeat_vector getCannonMoveSeats(const SSeat& fseat) const;
-    SSeat_vector getPawnMoveSeats(bool isBottom, const SSeat& fseat) const;
+    RowCol_pair_vector __getKingMoveRowCols(bool isBottom, const RowCol_pair& rowcol_pair) const;
+    RowCol_pair_vector __getAdvisorMoveRowCols(bool isBottom, const RowCol_pair& rowcol_pair) const;
+    RowCol_pair_vector __getBishopMoveRowCols(bool isBottom, const RowCol_pair& rowcol_pair) const;
+    RowCol_pair_vector __getKnightMoveRowCols(bool isBottom, const RowCol_pair& rowcol_pair) const;
+    RowCol_pair_vector __getRookMoveRowCols(const RowCol_pair& rowcol_pair) const;
+    RowCol_pair_vector __getCannonMoveRowCols(const RowCol_pair& rowcol_pair) const;
+    RowCol_pair_vector __getPawnMoveRowCols(bool isBottom, const RowCol_pair& rowcol_pair) const;
 
     // 排除同颜色棋子，fseat为空则无需排除
-    SSeat_vector __getMoveSeats(const RowCol_pair_vector& rowcols, const SSeat& fseat = nullptr) const;
+    RowCol_pair_vector __getMoveRowCols(const RowCol_pair_vector& rowcol_pv, const RowCol_pair& rowcol_pair) const;
 
-    const RowCol_pair_vector __getNonObs_MoveRowcols(bool isBottom, const SSeat& fseat,
-        const PRowCol_pair_vector getObs_MoveRowcols(bool, int, int)) const;
-    const RowCol_pair_vector __getRook_MoveRowcols(const SSeat& fseat) const;
-    const RowCol_pair_vector __getCannon_MoveRowcols(const SSeat& fseat) const;
+    RowCol_pair_vector __getNonObs_MoveRowCols(bool isBottom, const RowCol_pair& rowcol_pair,
+        PRowCol_pair_vector getObs_MoveRowCols(bool, const RowCol_pair&)) const;
+    RowCol_pair_vector __getRook_MoveRowCols(const RowCol_pair& rowcol_pair) const;
+    RowCol_pair_vector __getCannon_MoveRowCols(const RowCol_pair& rowcol_pair) const;
 };
 
 // 棋盘位置管理类
@@ -89,22 +83,18 @@ public:
     static RowCol_pair getRotate(RowCol_pair rowcol_pair) { return make_pair(BOARDROWNUM - 1 - rowcol_pair.first, BOARDCOLNUM - 1 - rowcol_pair.second); }
     static RowCol_pair getSymmetry(RowCol_pair rowcol_pair) { return make_pair(rowcol_pair.first, BOARDCOLNUM - 1 - rowcol_pair.second); }
 
-    //static void movBack(SSeat& fseat, SSeat& tseat, const SPiece& eatPiece);
+    static RowCol_pair_vector getAllRowCols();
+    static RowCol_pair_vector getKingRowCols(bool isBottom);
+    static RowCol_pair_vector getAdvisorRowCols(bool isBottom);
+    static RowCol_pair_vector getBishopRowCols(bool isBottom);
+    static RowCol_pair_vector getPawnRowCols(bool isBottom);
 
-    static const RowCol_pair_vector getRowCols(const SSeat_vector& seats);
-
-    static const RowCol_pair_vector getAllRowcols();
-    static const RowCol_pair_vector getKingRowcols(bool isBottom);
-    static const RowCol_pair_vector getAdvisorRowcols(bool isBottom);
-    static const RowCol_pair_vector getBishopRowcols(bool isBottom);
-    static const RowCol_pair_vector getPawnRowcols(bool isBottom);
-
-    static const RowCol_pair_vector getKingMoveRowcols(bool isBottom, int frow, int fcol);
-    static const RowCol_pair_vector getAdvisorMoveRowcols(bool isBottom, int frow, int fcol);
-    static const PRowCol_pair_vector getBishopObs_MoveRowcols(bool isBottom, int frow, int fcol);
-    static const PRowCol_pair_vector getKnightObs_MoveRowcols(bool isBottom, int frow, int fcol);
-    static const vector<RowCol_pair_vector> getRookCannonMoveRowcol_Lines(int frow, int fcol);
-    static const RowCol_pair_vector getPawnMoveRowcols(bool isBottom, int frow, int fcol);
+    static RowCol_pair_vector getKingMoveRowCols(bool isBottom, const RowCol_pair& rowcol_pair);
+    static RowCol_pair_vector getAdvisorMoveRowCols(bool isBottom, const RowCol_pair& rowcol_pair);
+    static PRowCol_pair_vector getBishopObs_MoveRowCols(bool isBottom, const RowCol_pair& rowcol_pair);
+    static PRowCol_pair_vector getKnightObs_MoveRowCols(bool isBottom, const RowCol_pair& rowcol_pair);
+    static vector<RowCol_pair_vector> getRookCannonMoveRowCol_Lines(const RowCol_pair& rowcol_pair);
+    static RowCol_pair_vector getPawnMoveRowCols(bool isBottom, const RowCol_pair& rowcol_pair);
 
 private:
     static constexpr int RowLowIndex_{ 0 }, RowLowMidIndex_{ 2 }, RowLowUpIndex_{ 4 },
@@ -112,7 +102,6 @@ private:
         ColLowIndex_{ 0 }, ColMidLowIndex_{ 3 }, ColMidUpIndex_{ 5 }, ColUpIndex_{ 8 };
 };
 
-const wstring getSeatsStr(const SSeat_vector& seats);
 const wstring getRowColsStr(const RowCol_pair_vector& rowcols);
 }
 

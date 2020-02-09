@@ -67,7 +67,7 @@ private:
     };
 
 public:
-    ChessManual(const string& infilename = nullptr);
+    ChessManual(const string& infilename = string{});
 
     SMove& addNextMove(SMove& move, int frow, int fcol, int trow, int tcol, const wstring& remark) const;
     SMove& addOtherMove(SMove& move, int frow, int fcol, int trow, int tcol, const wstring& remark) const;
@@ -97,6 +97,11 @@ public:
     const wstring toString();
 
 private:
+    map<wstring, wstring> info_;
+    SBoard board_;
+    SMove rootMove_, currentMove_;
+    int movCount_{ 0 }, remCount_{ 0 }, remLenMax_{ 0 }, maxRow_{ 0 }, maxCol_{ 0 };
+    
     void __setFENplusFromFEN(const wstring& FEN, PieceColor color);
     void __setBoardFromInfo();
 
@@ -122,11 +127,6 @@ private:
 
     void __readMove_PGN_CC(wistream& wis);
     void __writeMove_PGN_CC(wostream& wos) const;
-
-    map<wstring, wstring> info_;
-    SBoard board_;
-    SMove rootMove_, currentMove_;
-    int movCount_{ 0 }, remCount_{ 0 }, remLenMax_{ 0 }, maxRow_{ 0 }, maxCol_{ 0 };
 };
 
 void transDir(const string& dirfrom, const RecFormat fmt);

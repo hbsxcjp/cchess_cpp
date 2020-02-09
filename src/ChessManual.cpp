@@ -87,7 +87,7 @@ ChessManual::ChessManual(const string& infilename)
     , rootMove_{ make_shared<Move>() }
     , currentMove_{ make_shared<Move>() }
 {
-    infilename.empty() ? read(infilename) : reset();
+    read(infilename);
 }
 
 shared_ptr<ChessManual::Move>& ChessManual::addNextMove(
@@ -105,13 +105,13 @@ shared_ptr<ChessManual::Move>& ChessManual::addOtherMove(
 shared_ptr<ChessManual::Move>& ChessManual::addNextMove(
     SMove& move, const wstring& str, RecFormat fmt, const wstring& remark) const
 {
-    return move->addNext(board_->getPRowCol_pair(str, fmt), remark);
+    return move->addNext(board_->getPRowCol_pair(str), remark);
 }
 
 shared_ptr<ChessManual::Move>& ChessManual::addOtherMove(
     SMove& move, const wstring& str, RecFormat fmt, const wstring& remark) const
 {
-    return move->addOther(board_->getPRowCol_pair(str, fmt), remark);
+    return move->addOther(board_->getPRowCol_pair(str), remark);
 }
 
 void ChessManual::reset()
@@ -206,13 +206,25 @@ void ChessManual::changeSide(ChangeType ct)
 
 void ChessManual::read(const string& infilename)
 {
-    RecFormat fmt = getRecFormat(Tools::getExtStr(infilename));
-    ifstream is{};
-    wifstream wis{};
-    if (fmt == RecFormat::XQF || fmt == RecFormat::BIN || fmt == RecFormat::JSON)
-        is = ifstream(infilename, ios_base::binary);
-    else
-        wis = wifstream(infilename);
+    ifstream is;
+    wifstream wis;
+    RecFormat fmt{ RecFormat::XQF };
+    auto __isValid = [&]() {
+        if (infilename.empty())
+            return false;
+        fmt = getRecFormat(Tools::getExtStr(infilename));
+        if (fmt == RecFormat::XQF || fmt == RecFormat::BIN || fmt == RecFormat::JSON)
+            is.open(infilename, ios_base::binary);
+        else
+            wis.open(infilename);
+        if (is.fail() || wis.fail())
+            return false;
+        return true;
+    };
+    if (!__isValid()) {
+        reset(); // 默认初始化
+        return;
+    }
     switch (fmt) {
     case RecFormat::XQF:
         __readXQF(is);
@@ -244,13 +256,23 @@ void ChessManual::read(const string& infilename)
 
 void ChessManual::write(const string& outfilename)
 {
-    RecFormat fmt = getRecFormat(Tools::getExtStr(outfilename));
     ofstream os{};
     wofstream wos{};
-    if (fmt == RecFormat::XQF || fmt == RecFormat::BIN || fmt == RecFormat::JSON)
-        os = ofstream(outfilename, ios_base::binary);
-    else
-        wos = wofstream(outfilename);
+    RecFormat fmt{ RecFormat::PGN_CC };
+    auto __isValid = [&]() {
+        if (outfilename.empty())
+            return false;
+        fmt = getRecFormat(Tools::getExtStr(outfilename));
+        if (fmt == RecFormat::XQF || fmt == RecFormat::BIN || fmt == RecFormat::JSON)
+            os.open(outfilename, ios_base::binary);
+        else
+            wos.open(outfilename);
+        if (os.fail() || wos.fail())
+            return false;
+        return true;
+    };
+    if (!__isValid())
+        return;
     switch (fmt) {
     case RecFormat::XQF:
         break;
@@ -284,7 +306,7 @@ const wstring ChessManual::toString()
     // Board test
     wos << board_->toString() << L'\n';
 
-    /*
+    //*
     __writeInfo_PGN(wos);
     __writeMove_PGN_CC(wos);
 
@@ -333,7 +355,7 @@ void ChessManual::__setMoveFromStr(const SMove& move,
     const wstring& str, RecFormat fmt, const wstring& remark) const
 {
     if (fmt == RecFormat::PGN_ZH || fmt == RecFormat::PGN_CC)
-        move->setPRowCol_pair(board_->getPRowCol_pair(str, fmt));
+        move->setPRowCol_pair(board_->getPRowCol_pair(str));
     else
         move->setPRowCol_pair(make_pair(
             make_pair(PieceManager::getRowFromICCSChar(str.at(1)), PieceManager::getColFromICCSChar(str.at(0))),
@@ -353,7 +375,8 @@ void ChessManual::__setMoveZhStrAndNums()
                 ++remCount_;
                 remLenMax_ = max(remLenMax_, static_cast<int>(move->remark().size()));
             }
-            move->setZhStr(board_->getZhStr(move->getPRowCol_pair()));
+            move->setZhStr(board_->getZHStr(move->getPRowCol_pair()));
+            //wcout << move->zh() << endl;
 
             done(move);
             if (move->next())
@@ -493,7 +516,7 @@ void ChessManual::__readXQF(istream& is)
         { FENKey, pieCharsToFEN(pieceChars) } // 可能存在不是红棋先走的情况？在readMove后再更新一下！
     };
 
-    wcout << __LINE__ << L":" << pieceChars << endl;
+    //wcout << __LINE__ << L":" << pieceChars << endl;
     //__setFENplusFromPieChars(pieceChars, rootMove_->getSeat_pair().first->piece()->color());
     __setBoardFromInfo();
 
@@ -547,10 +570,10 @@ void ChessManual::__readXQF(istream& is)
             int fcolrow = __sub(frc, 0X18 + KeyXYf), tcolrow = __sub(trc, 0X20 + KeyXYt);
             assert(fcolrow <= 89 && tcolrow <= 89);
 
-            wcout << __LINE__ << L":" << fcolrow << L' ' << tcolrow << remark << endl;
+            //wcout << __LINE__ << L":" << fcolrow << L' ' << tcolrow << remark << endl;
             __setMoveFromRowcol(move, (fcolrow % 10) * 10 + fcolrow / 10,
                 (tcolrow % 10) * 10 + tcolrow / 10, remark);
-            wcout << __LINE__ << L":" << fcolrow << L' ' << tcolrow << remark << endl;
+            //wcout << __LINE__ << L":" << fcolrow << L' ' << tcolrow << remark << endl;
 
             char ntag{ tag };
             if (ntag & 0x80) //# 有左子树
@@ -562,7 +585,7 @@ void ChessManual::__readXQF(istream& is)
     is.seekg(1024);
     rootMove_->setRemark(__readDataAndGetRemark());
     char rtag{ tag };
-    wcout << __LINE__ << L":" << rootMove_->remark() << endl;
+    //wcout << __LINE__ << L":" << rootMove_->remark() << endl;
 
     if (rtag & 0x80) //# 有左子树
         __readMove(rootMove_->addNext());
@@ -757,11 +780,11 @@ void ChessManual::__readMove_PGN_ICCSZH(wistream& wis, RecFormat fmt)
             move = preMove->addNext();
         __setMoveFromStr(move, (*wtiMove)[3], fmt, (*wtiMove)[4]);
         //if (isPGN_ZH)
-        // wcout << (*wtiMove).str() << L'\n' << move->toString() << endl;
+        //wcout << (*wtiMove).str() << L'\n' << move->toString() << endl;
         if (isPGN_ZH)
             done(move); // 推进board的状态变化
         //if (isPGN_ZH)
-        // wcout << board_->toString() << endl;
+        //wcout << board_->toString() << endl;
 
         if ((*wtiMove)[5].matched)
             for (int num = (*wtiMove).length(5); num > 0; --num) {
@@ -985,32 +1008,24 @@ const wstring testChessmanual()
     wostringstream wos{};
     ChessManual cm{};
     cm.read("01.xqf");
-    wos << cm.toString();
 
+    cm.write("01.bin");
+    cm.read("01.bin");
+
+    cm.write("01.json");
+    cm.read("01.json");
+
+    cm.write("01.pgn_iccs");
+    cm.read("01.pgn_iccs");
     /*
-    write("01.bin");
-    read("01.bin");
 
-    write("01.json");
-    read("01.json");
+    cm.write("01.pgn_zh");
+    cm.read("01.pgn_zh");
 
-    write("01.pgn_iccs");
-    read("01.pgn_iccs");
+    cm.write("01.pgn_cc");
+    cm.read("01.pgn_cc");
 
-    write("01.pgn_zh");
-    read("01.pgn_zh");
-
-    write("01.pgn_cc");
-    read("01.pgn_cc");
-
-    auto str0 = toString();
-    changeSide(ChangeType::EXCHANGE);
-    auto str1 = toString();
-    changeSide(ChangeType::ROTATE);
-    auto str2 = toString();
-    changeSide(ChangeType::SYMMETRY);
-    auto str3 = toString();
-    wos << str0 + str1 + str2 + str3;
+    //wos << cm.toString();
     //*/
 
     return wos.str();

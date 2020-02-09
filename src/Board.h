@@ -14,14 +14,14 @@ public:
     bool isKilled(PieceColor color) const;
     bool isDied(PieceColor color) const;
 
-    PRowCol_pair getPRowCol_pair(const wstring& str, RecFormat fmt) const;
-    const wstring getZhStr(PRowCol_pair prowcol_pair) const;
+    PRowCol_pair getPRowCol_pair(const wstring& str) const;
+    const wstring getZHStr(PRowCol_pair prowcol_pair) const;
 
     const RowCol_pair_vector getPutRowCols(const SPiece& piece) const;
     const RowCol_pair_vector getCanMoveRowCols(RowCol_pair rowcol_pair) const;
     const RowCol_pair_vector getLiveRowCols(PieceColor color) const;
 
-    const SPiece& doneMove(PRowCol_pair prowcol_pair) const;
+    const SPiece doneMove(PRowCol_pair prowcol_pair) const;
     void undoMove(PRowCol_pair prowcol_pair, const SPiece& eatPie) const;
 
     void setPieces(const wstring& pieceChars);
@@ -36,8 +36,6 @@ private:
     shared_ptr<Seats> seats_;
 
     void __setBottomSide();
-    
-    SSeat_vector __getCanMoveSeats(SSeat fseat) const;
 };
 
 const wstring FENplusToFEN(const wstring& FENplus);

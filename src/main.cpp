@@ -1,6 +1,4 @@
-﻿// cchess_vs.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
-//
-#include "Board.h"
+﻿#include "Board.h"
 #include "ChessManual.h"
 #include "Tools.h"
 
@@ -11,24 +9,20 @@
 
 int main(int argc, char const* argv[])
 {
-    try {
-        using namespace std::chrono;
-        //std::locale loc = std::locale::global(std::locale(""));
-        setlocale(LC_ALL, "chs");
-        std::ios_base::sync_with_stdio(false);
+    using namespace std::chrono;
+    //std::locale loc = std::locale::global(std::locale(""));
+    setlocale(LC_ALL, "chs");
+    std::ios_base::sync_with_stdio(false);
 
-        auto time0 = steady_clock::now();
+    auto time0 = steady_clock::now();
 
-        string fname = "a.txt";
-        /* 
-        wofstream ofs(fname);
-        ofs << testBoard() << flush;
-        ofs.close();
-        //*/
-        std::wcout << testBoard();
-        //std::wcout << testChessmanual();
-        //Tools::writeFile(fname, testChessmanual());
-        /*
+    string fname = "a.txt";
+    wofstream wofs(fname);
+    //wcout = wofs;
+    //wofs << testBoard();
+    wofs << testChessmanual();
+    wofs.close();
+    /*
         if (argc == 7)
             testTransDir(std::stoi(argv[1]), std::stoi(argv[2]),
                 std::stoi(argv[3]), std::stoi(argv[4]), std::stoi(argv[5]), std::stoi(argv[6]));
@@ -43,24 +37,9 @@ int main(int argc, char const* argv[])
         }
         //*/
 
-        auto time_d = steady_clock::now() - time0;
-        std::cout << "use time: " << duration_cast<milliseconds>(time_d).count() / 1000.0 << "s\n";
+    auto time_d = steady_clock::now() - time0;
+    wcout << L"use time: " << duration_cast<milliseconds>(time_d).count() / 1000.0 << L"s\n";
 
-        //std::locale::global(loc);
-        return 0;
-    } catch (runtime_error err) {
-        cout << err.what() << endl;
-    }
-    return -74;
+    //std::locale::global(loc);
+    return 0;
 }
-
-// 运行程序: Ctrl + F5 或调试 >“开始执行(不调试)”菜单
-// 调试程序: F5 或调试 >“开始调试”菜单
-
-// 入门使用技巧:
-//   1. 使用解决方案资源管理器窗口添加/管理文件
-//   2. 使用团队资源管理器窗口连接到源代码管理
-//   3. 使用输出窗口查看生成输出和其他消息
-//   4. 使用错误列表窗口查看错误
-//   5. 转到“项目”>“添加新项”以创建新的代码文件，或转到“项目”>“添加现有项”以将现有代码文件添加到项目
-//   6. 将来，若要再次打开此项目，请转到“文件”>“打开”>“项目”并选择 .sln 文件

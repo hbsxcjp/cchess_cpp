@@ -4,7 +4,7 @@
 #vpath %.o obj
 
 CC = g++
-CFLAGS = -Wall -std=c++11 -fexec-charset=gbk -g# -iquote -g 
+CFLAGS = -Wall -std=c++11 -fexec-charset=gbk #-g 
 #LDFLAGS = -L/C/msys32/mingw32/lib -lpcre16 lib/pdcurses.a
 SP = src/
 OP = obj/
