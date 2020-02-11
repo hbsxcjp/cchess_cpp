@@ -35,8 +35,8 @@ public:
     const SSeat& getSeat(int row, int col) const;
     const SSeat& getSeat(RowCol_pair rowcol_pair) const;
     PieceColor getSideColor(bool isBottom) const;
-    bool isKilled(bool isBottom) const;
-    bool isDied(bool isBottom) const;
+    bool isKilled(PieceColor bottomColor, PieceColor color) const;
+    bool isDied(PieceColor bottomColor, PieceColor color) const;
 
     // 棋子可放置的位置
     RowCol_pair_vector getPutRowCols(PieceColor bottomColor, const SPiece& piece) const;
@@ -66,20 +66,12 @@ private:
     SSeat_vector __getSeats(const RowCol_pair_vector& rowcol_pv) const;
 
     // 排除同颜色棋子，fseat为空则无需排除
-    SSeat_vector __getMoveSeats(const SSeat_vector& seats, const SSeat& fseat) const;
+    SSeat_vector __getMoveSeats(PieceColor bottomColor, const RowCol_pair& rowcol_pair) const;
     // 取得棋盘上活的棋子
     SSeat_vector __getLiveSeats(PieceColor color, wchar_t name = BLANKNAME,
         int col = BLANKCOL, bool getStronge = false) const;
     // '多兵排序'
     SSeat_vector __getSortPawnLiveSeats(bool isBottom, PieceColor color, wchar_t name) const;
-
-    SSeat_vector __getKingMoveSeats(bool isBottom, const SSeat& fseat) const;
-    SSeat_vector __getAdvisorMoveSeats(bool isBottom, const SSeat& fseat) const;
-    SSeat_vector __getBishopMoveSeats(bool isBottom, const SSeat& fseat) const;
-    SSeat_vector __getKnightMoveSeats(bool isBottom, const SSeat& fseat) const;
-    SSeat_vector __getRookMoveSeats(const SSeat& fseat) const;
-    SSeat_vector __getCannonMoveSeats(const SSeat& fseat) const;
-    SSeat_vector __getPawnMoveSeats(bool isBottom, const SSeat& fseat) const;
 
     RowCol_pair_vector __getNonObs_MoveSeats(bool isBottom, const SSeat& fseat,
         PRowCol_pair_vector (*getObs_MoveRowCols)(bool, const RowCol_pair&)) const;

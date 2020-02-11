@@ -51,11 +51,10 @@ inline const SSeat& Seats::getSeat(RowCol_pair rowcol_pair) const
 
 PieceColor Seats::getSideColor(bool isBottom) const { return __getKingSeat(isBottom)->piece()->color(); }
 
-bool Seats::isKilled(bool isBottom) const
+bool Seats::isKilled(PieceColor bottomColor, PieceColor color) const
 {
+    bool isBottom = bottomColor == color;
     auto &kingSeat{ __getKingSeat(isBottom) }, &otherSeat{ __getKingSeat(!isBottom) };
-    PieceColor kingColor = kingSeat->piece()->color(),
-               otherColor = PieceManager::getOtherColor(kingColor);
     int kcol{ kingSeat->col() };
     if (kcol == otherSeat->col()) {
         int krow{ kingSeat->row() }, orow{ otherSeat->row() },
@@ -70,20 +69,18 @@ bool Seats::isKilled(bool isBottom) const
             return true; // 全部是空棋子，则将帅对面
     }
     // '获取某方可杀将棋子全部可走的位置
-    auto krowcol_pair = kingSeat->rowCol_pair();
-    for (auto& frowcol_p : getLiveRowCols(otherColor, BLANKNAME, BLANKCOL, true)) {
-        auto mvRowCols = getMoveRowCols(kingColor, frowcol_p);
-        if (!mvRowCols.empty() && find(mvRowCols.begin(), mvRowCols.end(), krowcol_pair) != mvRowCols.end()) // 对方强子可走位置有本将位置
+    for (const auto& lseat : __getLiveSeats(PieceManager::getOtherColor(color), BLANKNAME, BLANKCOL, true)) {
+        auto mseats = __getMoveSeats(bottomColor, lseat->rowCol_pair());
+        if (!mseats.empty() && find(mseats.begin(), mseats.end(), kingSeat) != mseats.end()) // 对方强子可走位置有本将位置
             return true;
     }
     return false;
 }
 
-bool Seats::isDied(bool isBottom) const
+bool Seats::isDied(PieceColor bottomColor, PieceColor color) const
 {
-    auto sideColor = getSideColor(isBottom);
-    for (auto& frowcol_p : getLiveRowCols(sideColor))
-        if (!getMoveRowCols(sideColor, frowcol_p).empty()) // 本方还有棋子可以走
+    for (const auto& fseat : __getLiveSeats(color))
+        if (!getMoveRowCols(bottomColor, fseat->rowCol_pair()).empty()) // 本方还有棋子可以走
             return false;
     return true;
 }
@@ -106,50 +103,24 @@ RowCol_pair_vector Seats::getPutRowCols(PieceColor sideColor, const SPiece& piec
     return SeatManager::getAllRowCols();
 }
 
-RowCol_pair_vector Seats::getMoveRowCols(PieceColor sideColor, const RowCol_pair& rowcol_pair) const
+RowCol_pair_vector Seats::getMoveRowCols(PieceColor bottomColor, const RowCol_pair& rowcol_pair) const
 {
     // 该位置需有棋子，由调用者board来保证
-    auto& fseat = getSeat(rowcol_pair);
-    auto& piece = fseat->piece();
-    assert(fseat->piece());
-    PieceColor color{ piece->color() };
-    bool isBottom = sideColor == color;
-    SSeat_vector seats;
-    switch (piece->kind()) {
-    case PieceKind::ROOK:
-        seats = __getRookMoveSeats(fseat);
-        break;
-    case PieceKind::KNIGHT:
-        seats = __getKnightMoveSeats(isBottom, fseat);
-        break;
-    case PieceKind::CANNON:
-        seats = __getCannonMoveSeats(fseat);
-        break;
-    case PieceKind::BISHOP:
-        seats = __getBishopMoveSeats(isBottom, fseat);
-        break;
-    case PieceKind::ADVISOR:
-        seats = __getAdvisorMoveSeats(isBottom, fseat);
-        break;
-    case PieceKind::PAWN:
-        seats = __getPawnMoveSeats(isBottom, fseat);
-        break;
-    case PieceKind::KING:
-        seats = __getKingMoveSeats(isBottom, fseat);
-        break;
-    default:
-        break;
-    };
+    //wcout << __LINE__ << L":" << setfill(L'0') << setw(2) << SeatManager::getRowCol(rowcol_pair) << endl;
+    auto mseats = __getMoveSeats(bottomColor, rowcol_pair);
+    //wcout << __LINE__ << L":" << fseat->toString() << endl;
 
-    auto pos = remove_if(seats.begin(), seats.end(),
+    auto& fseat = getSeat(rowcol_pair);
+    auto color = fseat->piece()->color();
+    auto pos = remove_if(mseats.begin(), mseats.end(),
         [&](const SSeat& tseat) {
             // 移动棋子后，检测是否会被对方将军
             auto eatPiece = fseat->movTo(tseat);
-            bool killed{ isKilled(isBottom) };
+            bool killed{ isKilled(bottomColor, color) };
             tseat->movTo(fseat, eatPiece);
             return killed;
         });
-    return __getRowCols(SSeat_vector{ seats.begin(), pos });
+    return __getRowCols(SSeat_vector{ mseats.begin(), pos });
 }
 
 RowCol_pair_vector Seats::getLiveRowCols(PieceColor color, wchar_t name, int col, bool getStronge) const
@@ -324,14 +295,44 @@ SSeat_vector Seats::__getSeats(const RowCol_pair_vector& rowcol_pv) const
     return seats;
 }
 
-SSeat_vector Seats::__getMoveSeats(const SSeat_vector& seats, const SSeat& fseat) const
+SSeat_vector Seats::__getMoveSeats(PieceColor bottomColor, const RowCol_pair& rowcol_pair) const
 {
-    SSeat_vector mseats{};
-    if (fseat->piece())
-        for (auto& tseat : seats)
-            if (!fseat->isSameColor(tseat)) // 非同一颜色
-                mseats.push_back(tseat);
-    return mseats;
+    auto& fseat = getSeat(rowcol_pair);
+    auto& piece = fseat->piece();
+    assert(fseat->piece());
+    bool isBottom = bottomColor == piece->color();
+    SSeat_vector seats;
+    switch (piece->kind()) {
+    case PieceKind::ROOK:
+        seats = __getRook_MoveSeats(fseat);
+        break;
+    case PieceKind::CANNON:
+        seats = __getCannon_MoveSeats(fseat);
+        break;
+    case PieceKind::KNIGHT:
+        seats = __getSeats(__getNonObs_MoveSeats(isBottom, fseat, &SeatManager::getKnightObs_MoveRowCols));
+        break;
+    case PieceKind::BISHOP:
+        seats = __getSeats(__getNonObs_MoveSeats(isBottom, fseat, &SeatManager::getBishopObs_MoveRowCols));
+        break;
+    case PieceKind::PAWN:
+        seats = __getSeats(SeatManager::getPawnMoveRowCols(isBottom, rowcol_pair));
+        break;
+    case PieceKind::ADVISOR:
+        seats = __getSeats(SeatManager::getAdvisorMoveRowCols(isBottom, rowcol_pair));
+        break;
+    case PieceKind::KING:
+        seats = __getSeats(SeatManager::getKingMoveRowCols(isBottom, rowcol_pair));
+        break;
+    default:
+        break;
+    };
+
+    auto pos = remove_if(seats.begin(), seats.end(),
+        [&](const SSeat& tseat) {
+            return fseat->isSameColor(tseat); // 非同一颜色
+        });
+    return SSeat_vector(seats.begin(), pos);
 }
 
 SSeat_vector Seats::__getLiveSeats(PieceColor color, wchar_t name, int col, bool getStronge) const
@@ -372,41 +373,6 @@ SSeat_vector Seats::__getSortPawnLiveSeats(bool isBottom, PieceColor color, wcha
     return seats;
 }
 
-SSeat_vector Seats::__getKingMoveSeats(bool isBottom, const SSeat& fseat) const
-{
-    return __getMoveSeats(__getSeats(SeatManager::getKingMoveRowCols(isBottom, fseat->rowCol_pair())), fseat);
-}
-
-SSeat_vector Seats::__getAdvisorMoveSeats(bool isBottom, const SSeat& fseat) const
-{
-    return __getMoveSeats(__getSeats(SeatManager::getAdvisorMoveRowCols(isBottom, fseat->rowCol_pair())), fseat);
-}
-
-SSeat_vector Seats::__getBishopMoveSeats(bool isBottom, const SSeat& fseat) const
-{
-    return __getMoveSeats(__getSeats(__getNonObs_MoveSeats(isBottom, fseat, &SeatManager::getBishopObs_MoveRowCols)), fseat);
-}
-
-SSeat_vector Seats::__getKnightMoveSeats(bool isBottom, const SSeat& fseat) const
-{
-    return __getMoveSeats(__getSeats(__getNonObs_MoveSeats(isBottom, fseat, &SeatManager::getKnightObs_MoveRowCols)), fseat);
-}
-
-SSeat_vector Seats::__getRookMoveSeats(const SSeat& fseat) const
-{
-    return __getMoveSeats(__getRook_MoveSeats(fseat), fseat);
-}
-
-SSeat_vector Seats::__getCannonMoveSeats(const SSeat& fseat) const
-{
-    return __getMoveSeats(__getCannon_MoveSeats(fseat), fseat);
-}
-
-SSeat_vector Seats::__getPawnMoveSeats(bool isBottom, const SSeat& fseat) const
-{
-    return __getMoveSeats(__getSeats(SeatManager::getPawnMoveRowCols(isBottom, fseat->rowCol_pair())), fseat);
-}
-
 RowCol_pair_vector Seats::__getNonObs_MoveSeats(bool isBottom, const SSeat& fseat,
     PRowCol_pair_vector (*getObs_MoveRowCols)(bool, const RowCol_pair&)) const
 {
@@ -426,9 +392,12 @@ SSeat_vector Seats::__getRook_MoveSeats(const SSeat& fseat) const
     for (auto& rowcolpair_Line : SeatManager::getRookCannonMoveRowCol_Lines(fseat->rowCol_pair()))
         for (auto& rowcol_pair : rowcolpair_Line) {
             auto& tseat = getSeat(rowcol_pair);
-            seats.push_back(tseat);
-            if (tseat->piece()) // 该位置有棋子
+            if (tseat->piece()) { // 该位置有棋子
+                if (!fseat->isSameColor(tseat)) // 非同一颜色
+                    seats.push_back(tseat);
                 break;
+            } else
+                seats.push_back(tseat);
         }
     return seats;
 }
@@ -448,7 +417,8 @@ Seats::__getCannon_MoveSeats(const SSeat& fseat) const
                 else
                     isSkip = true;
             } else if (piece) { // 该位置有棋子
-                seats.push_back(tseat);
+                if (!fseat->isSameColor(tseat)) // 非同一颜色
+                    seats.push_back(tseat);
                 break;
             }
         }
@@ -569,10 +539,10 @@ SeatManager::getBishopObs_MoveRowCols(bool isBottom, const RowCol_pair& rowcol_p
         rowUp{ isBottom ? RowLowUpIndex_ : RowUpIndex_ };
     auto pos = remove_if(obs_MoveRowCols.begin(), obs_MoveRowCols.end(),
         [&](const PRowCol_pair& obs_Moverowcol) {
-            return (obs_Moverowcol.first.first < rowLow
-                || obs_Moverowcol.first.first > rowUp
-                || obs_Moverowcol.first.second < ColLowIndex_
-                || obs_Moverowcol.first.second > ColUpIndex_);
+            return (obs_Moverowcol.second.first < rowLow
+                || obs_Moverowcol.second.first > rowUp
+                || obs_Moverowcol.second.second < ColLowIndex_
+                || obs_Moverowcol.second.second > ColUpIndex_);
         });
     return PRowCol_pair_vector{ obs_MoveRowCols.begin(), pos };
 }
@@ -593,10 +563,10 @@ SeatManager::getKnightObs_MoveRowCols(bool isBottom, const RowCol_pair& rowcol_p
     };
     auto pos = remove_if(obs_MoveRowCols.begin(), obs_MoveRowCols.end(),
         [&](const PRowCol_pair& obs_Moverowcol) {
-            return (obs_Moverowcol.first.first < RowLowIndex_
-                || obs_Moverowcol.first.first > RowUpIndex_
-                || obs_Moverowcol.first.second < ColLowIndex_
-                || obs_Moverowcol.first.second > ColUpIndex_);
+            return (obs_Moverowcol.second.first < RowLowIndex_
+                || obs_Moverowcol.second.first > RowUpIndex_
+                || obs_Moverowcol.second.second < ColLowIndex_
+                || obs_Moverowcol.second.second > ColUpIndex_);
         });
     return PRowCol_pair_vector{ obs_MoveRowCols.begin(), pos };
 }

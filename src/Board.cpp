@@ -15,12 +15,12 @@ Board::Board(const wstring& pieceChars)
 
 bool Board::isKilled(PieceColor color) const
 {
-    return seats_->isKilled(color == bottomColor_);
+    return seats_->isKilled(bottomColor_, color);
 }
 
 bool Board::isDied(PieceColor color) const
 {
-    return seats_->isDied(color == bottomColor_);
+    return seats_->isDied(bottomColor_, color);
 }
 
 PRowCol_pair Board::getPRowCol_pair(const wstring& str) const
@@ -245,13 +245,13 @@ const wstring testBoard()
                 wos << L"isBottomSide: " << boolalpha << board.isBottomSide(color) << L'\n'
                     << getRowColsStr(rowcols) << L'\n';
                 for (auto& rowcol_pair : rowcols)
-                    wos << L"From:" << rowcol_pair.first << rowcol_pair.second << L" CanMovtTo: "
+                    wos << L"From:" << setfill(L'0') << setw(2) << SeatManager::getRowCol(rowcol_pair) << L" CanMovtTo: "
                         << getRowColsStr(board.getMoveRowCols(rowcol_pair)) << L'\n';
             }
         };
         __printCanMoveRowCols();
         //*/
-        /*
+        //*
         for (const auto chg : {
                  ChangeType::EXCHANGE, ChangeType::ROTATE, ChangeType::SYMMETRY }) { //
             board.changeSide(chg);
