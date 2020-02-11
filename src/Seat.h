@@ -92,7 +92,8 @@ class SeatManager {
 public:
     static bool isBottom(int row) { return row < RowLowUpIndex_; };
     static int getIndex_rc(int row, int col) { return row * BOARDCOLNUM + col; }
-    static int getRowCol(RowCol_pair rowcol_pair) { return rowcol_pair.first * 10 + rowcol_pair.second; }
+    static int getRowCol(int row, int col) { return row * 10 + col; }
+    static int getRowCol(RowCol_pair rowcol_pair) { return getRowCol(rowcol_pair.first, rowcol_pair.second); }
     static RowCol_pair getRowCol_pair(int rowcol) { return make_pair(rowcol / 10, rowcol % 10); }
     static RowCol_pair getRotate(RowCol_pair rowcol_pair) { return make_pair(BOARDROWNUM - 1 - rowcol_pair.first, BOARDCOLNUM - 1 - rowcol_pair.second); }
     static RowCol_pair getSymmetry(RowCol_pair rowcol_pair) { return make_pair(rowcol_pair.first, BOARDCOLNUM - 1 - rowcol_pair.second); }

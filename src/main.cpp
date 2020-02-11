@@ -19,7 +19,7 @@ int main(int argc, char const* argv[])
     string fname = "a.txt";
     wofstream wofs(fname);
     //wcout = wofs;
-    //wofs << testBoard();
+    wofs << testBoard();
     wofs << testChessmanual();
     wofs.close();
     /*

@@ -212,9 +212,11 @@ const wstring Seats::getZHStr(PieceColor sideColor, PRowCol_pair prowcol_pair) c
     wstring wstr{};
     auto& fseat = getSeat(prowcol_pair.first);
     const SPiece& fromPiece{ fseat->piece() };
+    /*
     wcout << __LINE__ << L':' << setfill(L'0') << setw(2) << SeatManager::getRowCol(prowcol_pair.first) << L'-'
           << setw(2) << SeatManager::getRowCol(prowcol_pair.second)
           << L' ' << (fromPiece ? fromPiece->toString() : L"--") << L'\n';
+    //*/
 
     assert(fromPiece);
     PieceColor color{ fromPiece->color() };

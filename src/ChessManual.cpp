@@ -18,7 +18,7 @@ const wstring ChessManual::Move::iccs() const
 {
     wostringstream wos{};
     wos << PieceManager::getColICCSChar(prowcol_pair_.first.second) << prowcol_pair_.first.first
-        << PieceManager::getColICCSChar(prowcol_pair_.second.first) << prowcol_pair_.second.second;
+        << PieceManager::getColICCSChar(prowcol_pair_.second.second) << prowcol_pair_.second.first;
     return wos.str();
 }
 
@@ -376,8 +376,8 @@ void ChessManual::__setMoveZhStrAndNums()
                 remLenMax_ = max(remLenMax_, static_cast<int>(move->remark().size()));
             }
             move->setZhStr(board_->getZHStr(move->getPRowCol_pair()));
-            //wcout << move->zh() << endl;
 
+            //wcout << move->zh() << L'\n' << board_->toString() << L'\n' << endl;
             done(move);
             if (move->next())
                 __setZhStrAndNums(move->next());
@@ -1008,6 +1008,7 @@ const wstring testChessmanual()
     wostringstream wos{};
     ChessManual cm{};
     cm.read("01.xqf");
+    //*
 
     cm.write("01.bin");
     cm.read("01.bin");
@@ -1017,7 +1018,6 @@ const wstring testChessmanual()
 
     cm.write("01.pgn_iccs");
     cm.read("01.pgn_iccs");
-    /*
 
     cm.write("01.pgn_zh");
     cm.read("01.pgn_zh");
@@ -1025,6 +1025,8 @@ const wstring testChessmanual()
     cm.write("01.pgn_cc");
     cm.read("01.pgn_cc");
 
+    cm.write("01.pgn_cc");
+    cm.read("01.pgn_cc");
     //*/
     wos << cm.toString();
 
