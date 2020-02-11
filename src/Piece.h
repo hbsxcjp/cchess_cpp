@@ -1,7 +1,6 @@
-﻿//#pragma once
-#ifndef PIECE_H
+﻿#ifndef PIECE_H
 #define PIECE_H
- 
+
 #include "ChessType.h"
 
 namespace PieceSpace {
@@ -41,7 +40,7 @@ public:
 
 private:
     vector<SPiece> allPieces_;
- };
+};
 
 // 棋子管理类
 class PieceManager {
@@ -56,11 +55,11 @@ public:
         return nameChars_[chIndex_nameIndex.at(chChars_.find(ch))];
     }
 
-    static wchar_t getPrintName(const Piece& piece)
+    static wchar_t getPrintName(wchar_t ch)
     {
-        wchar_t name{ piece.name() };
-        if (piece.color() == PieceColor::BLACK) {
-            switch (piece.kind()) {
+        wchar_t name{ getName(ch) };
+        if (getColor(ch) == PieceColor::BLACK) {
+            switch (getKind(ch)) {
             case PieceKind::ROOK:
                 name = L'車';
                 break;
@@ -94,7 +93,7 @@ public:
             : PieceColor::BLACK;
     }
 
-    static PieceKind getKindFromCh(wchar_t ch)
+    static PieceKind getKind(wchar_t ch)
     {
         switch (toupper(ch)) {
         case L'K':
@@ -115,97 +114,58 @@ public:
         return PieceKind::PAWN;
     }
 
-    static bool isKing(wchar_t name)
-    {
-        return nameChars_.substr(0, 2).find(name) != wstring::npos;
-    }
-    static bool isAdvisor(wchar_t name)
-    {
-        return nameChars_.substr(2, 2).find(name) != wstring::npos;
-    }
-    static bool isBishop(wchar_t name)
-    {
-        return nameChars_.substr(4, 2).find(name) != wstring::npos;
-    }
-    static bool isKnight(wchar_t name)
-    {
-        return nameChars_[6] == name;
-    }
-    static bool isRook(wchar_t name)
-    {
-        return nameChars_[7] == name;
-    }
-    static bool isCannon(wchar_t name)
-    {
-        return nameChars_[8] == name;
-    }
-    static bool isStronge(wchar_t name)
-    {
-        return nameChars_.substr(6, 5).find(name) != wstring::npos;
-    }
-    static bool isLineMove(wchar_t name)
-    {
-        return isKing(name) || nameChars_.substr(7, 4).find(name) != wstring::npos;
-    }
-    static bool isPawn(wchar_t name)
-    {
-        return nameChars_.substr(nameChars_.size() - 2, 2).find(name) != wstring::npos;
-    }
-    static bool isPiece(wchar_t name)
-    {
-        return nameChars_.find(name) != wstring::npos;
-    };
+    static bool isKing(wchar_t name) { return nameChars_.substr(0, 2).find(name) != wstring::npos; }
+
+    static bool isAdvisor(wchar_t name) { return nameChars_.substr(2, 2).find(name) != wstring::npos; }
+
+    static bool isBishop(wchar_t name) { return nameChars_.substr(4, 2).find(name) != wstring::npos; }
+
+    static bool isKnight(wchar_t name) { return nameChars_[6] == name; }
+
+    static bool isRook(wchar_t name) { return nameChars_[7] == name; }
+
+    static bool isCannon(wchar_t name) { return nameChars_[8] == name; }
+
+    static bool isStronge(wchar_t name) { return nameChars_.substr(6, 5).find(name) != wstring::npos; }
+
+    static bool isLineMove(wchar_t name) { return isKing(name) || nameChars_.substr(7, 4).find(name) != wstring::npos; }
+
+    static bool isPawn(wchar_t name) { return nameChars_.substr(nameChars_.size() - 2, 2).find(name) != wstring::npos; }
+
+    static bool isPiece(wchar_t name) { return nameChars_.find(name) != wstring::npos; }
 
     static const wstring getPiecesChars() { return piecesChar_; }
-    static const wstring getZhChars()
-    {
-        return (preChars_ + nameChars_ + movChars_
-            + numChars_.at(PieceColor::RED) + numChars_.at(PieceColor::BLACK));
-    }
-    static const wstring getICCSChars()
-    {
-        return wstring(L"0123456789") + ICCSChars_;
-    }
+
+    static const wstring getZhChars() { return (preChars_ + nameChars_ + movChars_ + numChars_.at(PieceColor::RED) + numChars_.at(PieceColor::BLACK)); }
+
+    static const wstring getICCSChars() { return wstring(L"0123456789") + ICCSChars_; }
+
     static const wstring FirstFEN() { return FirstFEN_; }
 
     static int getRowFromICCSChar(wchar_t ch) { return ch - '0'; } // 0:48
+
     static int getColFromICCSChar(wchar_t ch) { return ICCSChars_.find(ch); }
+
     static wchar_t getColICCSChar(int col) { return ICCSChars_[col]; }
+
     static wchar_t nullChar() { return nullChar_; };
 
     // 宽字符与数字序号的转换
-    static int getMovNum(bool isBottom, wchar_t movChar)
-    {
-        return (-1 + movChars_.find(movChar)) * (isBottom ? 1 : -1);
-    }
-    static wchar_t getMovChar(bool isSameRow, bool isBottom, bool isLowToUp)
-    {
-        return movChars_[isSameRow ? 1 : (isBottom == isLowToUp ? 2 : 0)];
-    }
-    static wchar_t getNumChar(PieceColor color, int num)
-    {
-        return numChars_.at(color)[num - 1];
-    }
-    static int getNumIndex(PieceColor color, wchar_t numChar)
-    {
-        return 0 + numChars_.at(color).find(numChar);
-    }
-    static int getCurIndex(bool isBottom, int index, int len)
-    {
-        return isBottom ? len - 1 - index : index;
-    }
-    static int getPreIndex(int seatsLen, bool isBottom, wchar_t preChar)
-    {
-        return getCurIndex(isBottom, __getPreChars(seatsLen).find(preChar), seatsLen);
-    }
-    static wchar_t getPreChar(int seatsLen, bool isBottom, int index)
-    {
-        return __getPreChars(seatsLen)[getCurIndex(isBottom, index, seatsLen)];
-    }
-    static wchar_t getColChar(PieceColor color, bool isBottom, int colIndex)
-    {
-        return numChars_.at(color)[getCurIndex(isBottom, colIndex, BOARDCOLNUM)];
-    }
+    static int getMovNum(bool isBottom, wchar_t movChar) { return (-1 + movChars_.find(movChar)) * (isBottom ? 1 : -1); }
+
+    static wchar_t getMovChar(bool isSameRow, bool isBottom, bool isLowToUp) { return movChars_[isSameRow ? 1 : (isBottom == isLowToUp ? 2 : 0)]; }
+
+    static wchar_t getNumChar(PieceColor color, int num) { return numChars_.at(color)[num - 1]; }
+
+    static int getNumIndex(PieceColor color, wchar_t numChar) { return 0 + numChars_.at(color).find(numChar); }
+
+    static int getCurIndex(bool isBottom, int index, int len) { return isBottom ? len - 1 - index : index; }
+
+    static int getPreIndex(int seatsLen, bool isBottom, wchar_t preChar) { return getCurIndex(isBottom, __getPreChars(seatsLen).find(preChar), seatsLen); }
+
+    static wchar_t getPreChar(int seatsLen, bool isBottom, int index) { return __getPreChars(seatsLen)[getCurIndex(isBottom, index, seatsLen)]; }
+
+    static wchar_t getColChar(PieceColor color, bool isBottom, int colIndex) { return numChars_.at(color)[getCurIndex(isBottom, colIndex, BOARDCOLNUM)]; }
 
 private:
     static const wstring __getPreChars(int length)

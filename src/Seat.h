@@ -1,5 +1,4 @@
-﻿//#pragma once
-#ifndef SEAT_H
+﻿#ifndef SEAT_H
 #define SEAT_H
 
 #include "ChessType.h"
@@ -35,18 +34,23 @@ public:
 
     const SSeat& getSeat(int row, int col) const;
     const SSeat& getSeat(RowCol_pair rowcol_pair) const;
-
-    const SSeat& getKingSeat(bool isBottom) const;
+    PieceColor getSideColor(bool isBottom) const;
+    bool isKilled(bool isBottom) const;
+    bool isDied(bool isBottom) const;
 
     // 棋子可放置的位置
-    RowCol_pair_vector getPutRowCols(bool isBottom, const SPiece& piece) const;
+    RowCol_pair_vector getPutRowCols(PieceColor bottomColor, const SPiece& piece) const;
     // 某位置棋子可移动的位置（未排除被将军的情况）
-    RowCol_pair_vector getMoveRowCols(bool isBottom, const RowCol_pair& rowcol_pair) const;
+    RowCol_pair_vector getMoveRowCols(PieceColor bottomColor, const RowCol_pair& rowcol_pair) const;
     // 取得棋盘上活的棋子
     RowCol_pair_vector getLiveRowCols(PieceColor color, wchar_t name = BLANKNAME,
         int col = BLANKCOL, bool getStronge = false) const;
-    // '多兵排序'
-    RowCol_pair_vector getSortPawnLiveRowCols(bool isBottom, PieceColor color, wchar_t name) const;
+
+    PRowCol_pair getPRowCol_pair(PieceColor bottomColor, const wstring& str) const;
+    const wstring getZHStr(PieceColor bottomColor, PRowCol_pair prowcol_pair) const;
+
+    const SPiece doneMove(PRowCol_pair prowcol_pair) const;
+    void undoMove(PRowCol_pair prowcol_pair, const SPiece& eatPie) const;
 
     void setBoardPieces(const vector<SPiece>& boardPieces);
     void changeSide(const ChangeType ct, const shared_ptr<PieceSpace::Pieces>& pieces);
@@ -56,21 +60,31 @@ public:
 private:
     SSeat_vector allSeats_{};
 
-    RowCol_pair_vector __getKingMoveRowCols(bool isBottom, const RowCol_pair& rowcol_pair) const;
-    RowCol_pair_vector __getAdvisorMoveRowCols(bool isBottom, const RowCol_pair& rowcol_pair) const;
-    RowCol_pair_vector __getBishopMoveRowCols(bool isBottom, const RowCol_pair& rowcol_pair) const;
-    RowCol_pair_vector __getKnightMoveRowCols(bool isBottom, const RowCol_pair& rowcol_pair) const;
-    RowCol_pair_vector __getRookMoveRowCols(const RowCol_pair& rowcol_pair) const;
-    RowCol_pair_vector __getCannonMoveRowCols(const RowCol_pair& rowcol_pair) const;
-    RowCol_pair_vector __getPawnMoveRowCols(bool isBottom, const RowCol_pair& rowcol_pair) const;
+    const SSeat& __getKingSeat(bool isBottom) const;
+
+    RowCol_pair_vector __getRowCols(const SSeat_vector& seats) const;
+    SSeat_vector __getSeats(const RowCol_pair_vector& rowcol_pv) const;
 
     // 排除同颜色棋子，fseat为空则无需排除
-    RowCol_pair_vector __getMoveRowCols(const RowCol_pair_vector& rowcol_pv, const RowCol_pair& rowcol_pair) const;
+    SSeat_vector __getMoveSeats(const SSeat_vector& seats, const SSeat& fseat) const;
+    // 取得棋盘上活的棋子
+    SSeat_vector __getLiveSeats(PieceColor color, wchar_t name = BLANKNAME,
+        int col = BLANKCOL, bool getStronge = false) const;
+    // '多兵排序'
+    SSeat_vector __getSortPawnLiveSeats(bool isBottom, PieceColor color, wchar_t name) const;
 
-    RowCol_pair_vector __getNonObs_MoveRowCols(bool isBottom, const RowCol_pair& rowcol_pair,
-        PRowCol_pair_vector getObs_MoveRowCols(bool, const RowCol_pair&)) const;
-    RowCol_pair_vector __getRook_MoveRowCols(const RowCol_pair& rowcol_pair) const;
-    RowCol_pair_vector __getCannon_MoveRowCols(const RowCol_pair& rowcol_pair) const;
+    SSeat_vector __getKingMoveSeats(bool isBottom, const SSeat& fseat) const;
+    SSeat_vector __getAdvisorMoveSeats(bool isBottom, const SSeat& fseat) const;
+    SSeat_vector __getBishopMoveSeats(bool isBottom, const SSeat& fseat) const;
+    SSeat_vector __getKnightMoveSeats(bool isBottom, const SSeat& fseat) const;
+    SSeat_vector __getRookMoveSeats(const SSeat& fseat) const;
+    SSeat_vector __getCannonMoveSeats(const SSeat& fseat) const;
+    SSeat_vector __getPawnMoveSeats(bool isBottom, const SSeat& fseat) const;
+
+    RowCol_pair_vector __getNonObs_MoveSeats(bool isBottom, const SSeat& fseat,
+        PRowCol_pair_vector (*getObs_MoveRowCols)(bool, const RowCol_pair&)) const;
+    SSeat_vector __getRook_MoveSeats(const SSeat& fseat) const;
+    SSeat_vector __getCannon_MoveSeats(const SSeat& fseat) const;
 };
 
 // 棋盘位置管理类

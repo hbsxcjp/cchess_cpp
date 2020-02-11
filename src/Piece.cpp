@@ -8,15 +8,15 @@ Piece::Piece(wchar_t ch)
     : ch_{ ch }
     , name_{ PieceManager::getName(ch) }
     , color_{ PieceManager::getColor(ch) }
-    , kind_{ PieceManager::getKindFromCh(ch) }
+    , kind_{ PieceManager::getKind(ch) }
 {
 }
 
  const wstring Piece::toString() const
 {
     wostringstream wos{};
-    wos << (color() == PieceColor::RED ? L'+' : L'*') << static_cast<int>(kind())
-        << ch() << name() << PieceManager::getPrintName(*this);
+    wos << (color_ == PieceColor::RED ? L'+' : L'*') << static_cast<int>(kind_)
+        << ch_ << name_ << PieceManager::getPrintName(ch_);
     return wos.str();
 }
 /* ===== Piece end. ===== */

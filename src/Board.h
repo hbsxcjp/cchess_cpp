@@ -1,5 +1,4 @@
-﻿//#pragma once
-#ifndef BOARD_H
+﻿#ifndef BOARD_H
 #define BOARD_H
 
 #include "ChessType.h"
@@ -18,7 +17,7 @@ public:
     const wstring getZHStr(PRowCol_pair prowcol_pair) const;
 
     const RowCol_pair_vector getPutRowCols(const SPiece& piece) const;
-    const RowCol_pair_vector getCanMoveRowCols(RowCol_pair rowcol_pair) const;
+    const RowCol_pair_vector getMoveRowCols(RowCol_pair rowcol_pair) const;
     const RowCol_pair_vector getLiveRowCols(PieceColor color) const;
 
     const SPiece doneMove(PRowCol_pair prowcol_pair) const;

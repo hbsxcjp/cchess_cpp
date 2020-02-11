@@ -1,5 +1,4 @@
-﻿//#pragma once
-#ifndef CHESSMANUAL_H
+﻿#ifndef CHESSMANUAL_H
 #define CHESSMANUAL_H
 // 中国象棋棋盘布局类型 by-cjp
 
@@ -78,8 +77,8 @@ public:
     void read(const string& infilename);
     void write(const string& outfilename);
 
-    void done(SMove move);
-    void undo(SMove move);
+    void done(const SMove& move);
+    void undo(const SMove& move);
     void go();
     void back();
     void backTo(const SMove& move);
@@ -101,7 +100,7 @@ private:
     SBoard board_;
     SMove rootMove_, currentMove_;
     int movCount_{ 0 }, remCount_{ 0 }, remLenMax_{ 0 }, maxRow_{ 0 }, maxCol_{ 0 };
-    
+
     void __setFENplusFromFEN(const wstring& FEN, PieceColor color);
     void __setBoardFromInfo();
 

@@ -122,12 +122,12 @@ void ChessManual::reset()
     movCount_ = remCount_ = remLenMax_ = maxRow_ = maxCol_ = 0;
 }
 
-void ChessManual::done(SMove move)
+void ChessManual::done(const SMove& move)
 {
     move->setEatPie(board_->doneMove(move->getPRowCol_pair()));
 }
 
-void ChessManual::undo(SMove move)
+void ChessManual::undo(const SMove& move)
 {
     board_->undoMove(move->getPRowCol_pair(), move->eatPie());
 }
@@ -306,10 +306,10 @@ const wstring ChessManual::toString()
     // Board test
     wos << board_->toString() << L'\n';
 
-    //*
     __writeInfo_PGN(wos);
     __writeMove_PGN_CC(wos);
 
+    /*
     backTo(rootMove_);
     vector<SMove> preMoves{};
     function<void(bool)>
@@ -1025,8 +1025,8 @@ const wstring testChessmanual()
     cm.write("01.pgn_cc");
     cm.read("01.pgn_cc");
 
-    //wos << cm.toString();
     //*/
+    wos << cm.toString();
 
     return wos.str();
 }
