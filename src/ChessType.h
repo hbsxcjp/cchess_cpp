@@ -5,6 +5,7 @@
 #include <cassert>
 #include <cctype>
 #include <cmath>
+#include <codecvt>
 #include <direct.h>
 #include <fstream>
 #include <functional>
@@ -95,5 +96,13 @@ constexpr auto BOARDROWNUM = 10;
 constexpr auto BOARDCOLNUM = 9;
 constexpr auto SEATNUM = BOARDROWNUM * BOARDCOLNUM;
 
-
+/*
+class chs_codecvt : public std::codecvt_byname<wchar_t, char, std::mbstate_t> {
+public:
+    chs_codecvt()
+        : codecvt_byname("chs")
+    {
+    } //zh_CN.GBK or .936
+};
+//*/
 #endif

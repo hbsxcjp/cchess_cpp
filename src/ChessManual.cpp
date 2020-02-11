@@ -7,6 +7,8 @@
 
 namespace ChessManualSpace {
 
+wstring_convert<codecvt_utf8<wchar_t>> wscvt; // 未能成功调用
+
 static const wchar_t FENKey[] = L"FEN";
 
 /* ===== ChessManual::Move start. ===== */
