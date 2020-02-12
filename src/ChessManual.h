@@ -68,8 +68,8 @@ private:
 public:
     ChessManual(const string& infilename = string{});
 
-    SMove& addNextMove(SMove& move, int frow, int fcol, int trow, int tcol, const wstring& remark) const;
-    SMove& addOtherMove(SMove& move, int frow, int fcol, int trow, int tcol, const wstring& remark) const;
+    SMove& addNextMove(SMove& move, const PRowCol_pair& prowcol_pair, const wstring& remark) const;
+    SMove& addOtherMove(SMove& move, const PRowCol_pair& prowcol_pair, const wstring& remark) const;
     SMove& addNextMove(SMove& move, const wstring& str, RecFormat fmt, const wstring& remark) const;
     SMove& addOtherMove(SMove& move, const wstring& str, RecFormat fmt, const wstring& remark) const;
 
@@ -104,8 +104,8 @@ private:
     void __setFENplusFromFEN(const wstring& FEN, PieceColor color);
     void __setBoardFromInfo();
 
-    void __setMoveFromRowcol(const SMove& move, int frowcol, int trowcol, const wstring& remark) const;
     void __setMoveFromStr(const SMove& move, const wstring& str, RecFormat fmt, const wstring& remark) const;
+    PRowCol_pair __getPRowCol_pair(const wstring& str, RecFormat fmt) const;
     void __setMoveZhStrAndNums();
 
     const wstring __moveInfo() const;

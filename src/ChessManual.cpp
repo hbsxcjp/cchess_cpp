@@ -44,7 +44,7 @@ shared_ptr<ChessManual::Move>& ChessManual::Move::addOther()
 
 shared_ptr<ChessManual::Move>& ChessManual::Move::addNext(const PRowCol_pair& prowcol_pair, const wstring& remark)
 {
-    auto nextMove = this->addNext();
+    auto nextMove = addNext();
     nextMove->setPRowCol_pair(prowcol_pair);
     nextMove->setRemark(remark);
     return next_ = nextMove;
@@ -53,7 +53,7 @@ shared_ptr<ChessManual::Move>& ChessManual::Move::addNext(const PRowCol_pair& pr
 shared_ptr<ChessManual::Move>& ChessManual::Move::addOther(const PRowCol_pair& prowcol_pair, const wstring& remark)
 {
 
-    auto otherMove = this->addOther();
+    auto otherMove = addOther();
     otherMove->setPRowCol_pair(prowcol_pair);
     otherMove->setRemark(remark);
     return other_ = otherMove;
@@ -93,27 +93,27 @@ ChessManual::ChessManual(const string& infilename)
 }
 
 shared_ptr<ChessManual::Move>& ChessManual::addNextMove(
-    SMove& move, int frow, int fcol, int trow, int tcol, const wstring& remark) const
+    SMove& move, const PRowCol_pair& prowcol_pair, const wstring& remark) const
 {
-    return move->addNext(make_pair(make_pair(frow, fcol), make_pair(trow, tcol)), remark);
+    return move->addNext(prowcol_pair, remark);
 }
 
 shared_ptr<ChessManual::Move>& ChessManual::addOtherMove(
-    SMove& move, int frow, int fcol, int trow, int tcol, const wstring& remark) const
+    SMove& move, const PRowCol_pair& prowcol_pair, const wstring& remark) const
 {
-    return move->addOther(make_pair(make_pair(frow, fcol), make_pair(trow, tcol)), remark);
+    return move->addOther(prowcol_pair, remark);
 }
 
 shared_ptr<ChessManual::Move>& ChessManual::addNextMove(
     SMove& move, const wstring& str, RecFormat fmt, const wstring& remark) const
 {
-    return move->addNext(board_->getPRowCol_pair(str), remark);
+    return move->addNext(__getPRowCol_pair(str, fmt), remark);
 }
 
 shared_ptr<ChessManual::Move>& ChessManual::addOtherMove(
     SMove& move, const wstring& str, RecFormat fmt, const wstring& remark) const
 {
-    return move->addOther(board_->getPRowCol_pair(str), remark);
+    return move->addOther(__getPRowCol_pair(str, fmt), remark);
 }
 
 void ChessManual::reset()
@@ -186,10 +186,9 @@ void ChessManual::changeSide(ChangeType ct)
         //auto changeRowcol = mem_fn(ct == ChangeType::ROTATE ? &SeatManager::getRotate : &SeatManager::getSymmetry);
         function<void(const SMove&)>
             __resetMove = [&](const SMove& move) {
-                auto pprowcol_pair = move->getPRowCol_pair();
-                auto frowcol = SeatManager::getRowCol(changeRowcol(pprowcol_pair.first));
-                auto trowcol = SeatManager::getRowCol(changeRowcol(pprowcol_pair.second));
-                __setMoveFromRowcol(move, frowcol, trowcol, move->remark());
+                auto move_cp = move; //复制一个副本，用来修改内部数据
+                move_cp->setPRowCol_pair(make_pair(changeRowcol(move->getPRowCol_pair().first),
+                    changeRowcol(move->getPRowCol_pair().second)));
                 if (move->next())
                     __resetMove(move->next());
                 if (move->other())
@@ -345,14 +344,6 @@ void ChessManual::__setBoardFromInfo()
 }
 
 // 将用addNext代替
-void ChessManual::__setMoveFromRowcol(const SMove& move,
-    int frowcol, int trowcol, const wstring& remark) const
-{
-    move->setPRowCol_pair(make_pair(SeatManager::getRowCol_pair(frowcol), SeatManager::getRowCol_pair(trowcol)));
-    move->setRemark(remark);
-}
-
-// 将用addNext代替
 void ChessManual::__setMoveFromStr(const SMove& move,
     const wstring& str, RecFormat fmt, const wstring& remark) const
 {
@@ -363,6 +354,16 @@ void ChessManual::__setMoveFromStr(const SMove& move,
             make_pair(PieceManager::getRowFromICCSChar(str.at(1)), PieceManager::getColFromICCSChar(str.at(0))),
             make_pair(PieceManager::getRowFromICCSChar(str.at(3)), PieceManager::getColFromICCSChar(str.at(2)))));
     move->setRemark(remark);
+}
+
+PRowCol_pair ChessManual::__getPRowCol_pair(const wstring& str, RecFormat fmt) const
+{
+    if (fmt == RecFormat::PGN_ZH || fmt == RecFormat::PGN_CC)
+        return board_->getPRowCol_pair(str);
+    else
+        return make_pair(
+            make_pair(PieceManager::getRowFromICCSChar(str.at(1)), PieceManager::getColFromICCSChar(str.at(0))),
+            make_pair(PieceManager::getRowFromICCSChar(str.at(3)), PieceManager::getColFromICCSChar(str.at(2))));
 }
 
 void ChessManual::__setMoveZhStrAndNums()
@@ -565,24 +566,25 @@ void ChessManual::__readXQF(istream& is)
         return wstr;
     };
 
-    function<void(const SMove&)>
-        __readMove = [&](const SMove& move) {
-            auto remark = __readDataAndGetRemark();
-            //# 一步棋的起点和终点有简单的加密计算，读入时需要还原
-            int fcolrow = __sub(frc, 0X18 + KeyXYf), tcolrow = __sub(trc, 0X20 + KeyXYt);
-            assert(fcolrow <= 89 && tcolrow <= 89);
+    //function<void(const SMove&)>
+    //  __readMove = [&](const SMove& move) {
+    function<void(SMove&, bool)> __readMove = [&](SMove& move, bool isOther) {
+        auto remark = __readDataAndGetRemark();
+        //# 一步棋的起点和终点有简单的加密计算，读入时需要还原
+        int fcolrow = __sub(frc, 0X18 + KeyXYf), tcolrow = __sub(trc, 0X20 + KeyXYt);
+        assert(fcolrow <= 89 && tcolrow <= 89);
 
-            //wcout << __LINE__ << L":" << fcolrow << L' ' << tcolrow << remark << endl;
-            __setMoveFromRowcol(move, (fcolrow % 10) * 10 + fcolrow / 10,
-                (tcolrow % 10) * 10 + tcolrow / 10, remark);
-            //wcout << __LINE__ << L":" << fcolrow << L' ' << tcolrow << remark << endl;
+        //wcout << __LINE__ << L":" << fcolrow << L' ' << tcolrow << remark << endl;
+        auto prowcol_pair = make_pair(make_pair(fcolrow % 10, fcolrow / 10), make_pair(tcolrow % 10, tcolrow / 10));
+        auto& newMove = (isOther ? addOtherMove(move, prowcol_pair, remark) : addNextMove(move, prowcol_pair, remark));
+        //wcout << __LINE__ << L":" << fcolrow << L' ' << tcolrow << remark << endl;
 
-            char ntag{ tag };
-            if (ntag & 0x80) //# 有左子树
-                __readMove(move->addNext());
-            if (ntag & 0x40) // # 有右子树
-                __readMove(move->addOther());
-        };
+        char ntag{ tag };
+        if (ntag & 0x80) //# 有左子树
+            __readMove(newMove, false);
+        if (ntag & 0x40) // # 有右子树
+            __readMove(newMove, true);
+    };
 
     is.seekg(1024);
     rootMove_->setRemark(__readDataAndGetRemark());
@@ -590,7 +592,7 @@ void ChessManual::__readXQF(istream& is)
     //wcout << __LINE__ << L":" << rootMove_->remark() << endl;
 
     if (rtag & 0x80) //# 有左子树
-        __readMove(rootMove_->addNext());
+        __readMove(rootMove_, false);
 }
 
 void ChessManual::__readBIN(istream& is)
@@ -608,16 +610,18 @@ void ChessManual::__readBIN(istream& is)
     };
 
     char frowcol{}, trowcol{};
-    function<void(const SMove&)>
-        __readMove = [&](const SMove& move) {
+    function<void(SMove&, bool)>
+        __readMove = [&](SMove& move, bool isOther) {
             char tag{};
             is.get(frowcol).get(trowcol).get(tag);
-            __setMoveFromRowcol(move, frowcol, trowcol, (tag & 0x20) ? __readWstring() : wstring{});
+            auto prowcol_pair = make_pair(SeatManager::getRowCol_pair(frowcol), SeatManager::getRowCol_pair(trowcol));
+            auto remark = (tag & 0x20) ? __readWstring() : wstring{};
+            auto& newMove = (isOther ? addOtherMove(move, prowcol_pair, remark) : addNextMove(move, prowcol_pair, remark));
 
             if (tag & 0x80)
-                __readMove(move->addNext());
+                __readMove(newMove, false);
             if (tag & 0x40)
-                __readMove(move->addOther());
+                __readMove(newMove, true);
             return move;
         };
 
@@ -638,7 +642,7 @@ void ChessManual::__readBIN(istream& is)
     if (atag & 0x40)
         rootMove_->setRemark(__readWstring());
     if (atag & 0x20)
-        __readMove(rootMove_->addNext());
+        __readMove(rootMove_, false);
 }
 
 void ChessManual::__writeBIN(ostream& os) const
@@ -694,22 +698,23 @@ void ChessManual::__readJSON(istream& is)
         info_[Tools::s2ws(key)] = Tools::s2ws(infoItem[key].asString());
     __setBoardFromInfo();
 
-    function<void(const SMove&, Json::Value&)>
-        __readMove = [&](const SMove& move, Json::Value& item) {
+    function<void(SMove&, bool, Json::Value&)>
+        __readMove = [&](SMove& move, bool isOther, Json::Value& item) {
             int frowcol{ item["f"].asInt() }, trowcol{ item["t"].asInt() };
-            __setMoveFromRowcol(move, frowcol, trowcol,
-                (item.isMember("r")) ? Tools::s2ws(item["r"].asString()) : wstring{});
+            auto prowcol_pair = make_pair(SeatManager::getRowCol_pair(frowcol), SeatManager::getRowCol_pair(trowcol));
+            auto remark = (item.isMember("r") ? Tools::s2ws(item["r"].asString()) : wstring{});
+            auto& newMove = (isOther ? addOtherMove(move, prowcol_pair, remark) : addNextMove(move, prowcol_pair, remark));
 
             if (item.isMember("n"))
-                __readMove(move->addNext(), item["n"]);
+                __readMove(newMove, false, item["n"]);
             if (item.isMember("o"))
-                __readMove(move->addOther(), item["o"]);
+                __readMove(newMove, true, item["o"]);
         };
 
     rootMove_->setRemark(Tools::s2ws(root["remark"].asString()));
     Json::Value rootItem{ root["moves"] };
     if (!rootItem.isNull())
-        __readMove(rootMove_->addNext(), rootItem);
+        __readMove(rootMove_, false, rootItem);
 }
 
 void ChessManual::__writeJSON(ostream& os) const
