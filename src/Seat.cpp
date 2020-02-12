@@ -80,7 +80,7 @@ bool Seats::isKilled(PieceColor bottomColor, PieceColor color) const
 bool Seats::isDied(PieceColor bottomColor, PieceColor color) const
 {
     for (const auto& fseat : __getLiveSeats(color))
-        if (!getMoveRowCols(bottomColor, fseat->rowCol_pair()).empty()) // 本方还有棋子可以走
+        if (!__getCanMoveSeats(bottomColor, fseat->rowCol_pair()).empty()) // 本方还有棋子可以走
             return false;
     return true;
 }
@@ -103,24 +103,9 @@ RowCol_pair_vector Seats::getPutRowCols(PieceColor sideColor, const SPiece& piec
     return SeatManager::getAllRowCols();
 }
 
-RowCol_pair_vector Seats::getMoveRowCols(PieceColor bottomColor, const RowCol_pair& rowcol_pair) const
+RowCol_pair_vector Seats::getCanMoveRowCols(PieceColor bottomColor, const RowCol_pair& rowcol_pair) const
 {
-    // 该位置需有棋子，由调用者board来保证
-    //wcout << __LINE__ << L":" << setfill(L'0') << setw(2) << SeatManager::getRowCol(rowcol_pair) << endl;
-    auto mseats = __getMoveSeats(bottomColor, rowcol_pair);
-    //wcout << __LINE__ << L":" << fseat->toString() << endl;
-
-    auto& fseat = getSeat(rowcol_pair);
-    auto color = fseat->piece()->color();
-    auto pos = remove_if(mseats.begin(), mseats.end(),
-        [&](const SSeat& tseat) {
-            // 移动棋子后，检测是否会被对方将军
-            auto eatPiece = fseat->movTo(tseat);
-            bool killed{ isKilled(bottomColor, color) };
-            tseat->movTo(fseat, eatPiece);
-            return killed;
-        });
-    return __getRowCols(SSeat_vector{ mseats.begin(), pos });
+    return __getRowCols(__getCanMoveSeats(bottomColor, rowcol_pair));
 }
 
 RowCol_pair_vector Seats::getLiveRowCols(PieceColor color, wchar_t name, int col, bool getStronge) const
@@ -310,10 +295,10 @@ SSeat_vector Seats::__getMoveSeats(PieceColor bottomColor, const RowCol_pair& ro
         seats = __getCannon_MoveSeats(fseat);
         break;
     case PieceKind::KNIGHT:
-        seats = __getSeats(__getNonObs_MoveSeats(isBottom, fseat, &SeatManager::getKnightObs_MoveRowCols));
+        seats = __getSeats(__getNonObs_MoveRowCols(isBottom, rowcol_pair, &SeatManager::getKnightObs_MoveRowCols));
         break;
     case PieceKind::BISHOP:
-        seats = __getSeats(__getNonObs_MoveSeats(isBottom, fseat, &SeatManager::getBishopObs_MoveRowCols));
+        seats = __getSeats(__getNonObs_MoveRowCols(isBottom, rowcol_pair, &SeatManager::getBishopObs_MoveRowCols));
         break;
     case PieceKind::PAWN:
         seats = __getSeats(SeatManager::getPawnMoveRowCols(isBottom, rowcol_pair));
@@ -333,6 +318,26 @@ SSeat_vector Seats::__getMoveSeats(PieceColor bottomColor, const RowCol_pair& ro
             return fseat->isSameColor(tseat); // 非同一颜色
         });
     return SSeat_vector(seats.begin(), pos);
+}
+
+SSeat_vector Seats::__getCanMoveSeats(PieceColor bottomColor, const RowCol_pair& rowcol_pair) const
+{
+    // 该位置需有棋子，由调用者board来保证
+    //wcout << __LINE__ << L":" << setfill(L'0') << setw(2) << SeatManager::getRowCol(rowcol_pair) << endl;
+    auto mseats = __getMoveSeats(bottomColor, rowcol_pair);
+    //wcout << __LINE__ << L":" << fseat->toString() << endl;
+
+    auto& fseat = getSeat(rowcol_pair);
+    auto color = fseat->piece()->color();
+    auto pos = remove_if(mseats.begin(), mseats.end(),
+        [&](const SSeat& tseat) {
+            // 移动棋子后，检测是否会被对方将军
+            auto eatPiece = fseat->movTo(tseat);
+            bool killed{ isKilled(bottomColor, color) };
+            tseat->movTo(fseat, eatPiece);
+            return killed;
+        });
+    return SSeat_vector{ mseats.begin(), pos };
 }
 
 SSeat_vector Seats::__getLiveSeats(PieceColor color, wchar_t name, int col, bool getStronge) const
@@ -363,7 +368,7 @@ SSeat_vector Seats::__getSortPawnLiveSeats(bool isBottom, PieceColor color, wcha
 
     // 整合成一个数组
     for (auto& colseat_pv : colSeats) {
-        auto seat_v = colseat_pv.second;
+        auto& seat_v = colseat_pv.second;
         if (seat_v.size() > 1) { // 筛除只有一个位置的列
             if (isBottom)
                 reverse(seat_v.begin(), seat_v.end());
@@ -373,11 +378,11 @@ SSeat_vector Seats::__getSortPawnLiveSeats(bool isBottom, PieceColor color, wcha
     return seats;
 }
 
-RowCol_pair_vector Seats::__getNonObs_MoveSeats(bool isBottom, const SSeat& fseat,
+RowCol_pair_vector Seats::__getNonObs_MoveRowCols(bool isBottom, const RowCol_pair& rowcol_pair,
     PRowCol_pair_vector (*getObs_MoveRowCols)(bool, const RowCol_pair&)) const
 {
     RowCol_pair_vector rowcol_pv{};
-    auto obs_MoveRowCols = getObs_MoveRowCols(isBottom, fseat->rowCol_pair());
+    auto obs_MoveRowCols = getObs_MoveRowCols(isBottom, rowcol_pair);
     for_each(obs_MoveRowCols.begin(), obs_MoveRowCols.end(),
         [&](const PRowCol_pair& obs_Moverowcol) {
             if (!getSeat(obs_Moverowcol.first)->piece()) // 该位置无棋子

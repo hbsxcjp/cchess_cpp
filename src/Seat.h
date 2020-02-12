@@ -40,8 +40,7 @@ public:
 
     // 棋子可放置的位置
     RowCol_pair_vector getPutRowCols(PieceColor bottomColor, const SPiece& piece) const;
-    // 某位置棋子可移动的位置（未排除被将军的情况）
-    RowCol_pair_vector getMoveRowCols(PieceColor bottomColor, const RowCol_pair& rowcol_pair) const;
+    RowCol_pair_vector getCanMoveRowCols(PieceColor bottomColor, const RowCol_pair& rowcol_pair) const;
     // 取得棋盘上活的棋子
     RowCol_pair_vector getLiveRowCols(PieceColor color, wchar_t name = BLANKNAME,
         int col = BLANKCOL, bool getStronge = false) const;
@@ -67,13 +66,15 @@ private:
 
     // 排除同颜色棋子，fseat为空则无需排除
     SSeat_vector __getMoveSeats(PieceColor bottomColor, const RowCol_pair& rowcol_pair) const;
+    // 某位置棋子可移动的位置（未排除被将军的情况）
+    SSeat_vector __getCanMoveSeats(PieceColor bottomColor, const RowCol_pair& rowcol_pair) const;
     // 取得棋盘上活的棋子
     SSeat_vector __getLiveSeats(PieceColor color, wchar_t name = BLANKNAME,
         int col = BLANKCOL, bool getStronge = false) const;
     // '多兵排序'
     SSeat_vector __getSortPawnLiveSeats(bool isBottom, PieceColor color, wchar_t name) const;
 
-    RowCol_pair_vector __getNonObs_MoveSeats(bool isBottom, const SSeat& fseat,
+    RowCol_pair_vector __getNonObs_MoveRowCols(bool isBottom, const RowCol_pair& rowcol_pair,
         PRowCol_pair_vector (*getObs_MoveRowCols)(bool, const RowCol_pair&)) const;
     SSeat_vector __getRook_MoveSeats(const SSeat& fseat) const;
     SSeat_vector __getCannon_MoveSeats(const SSeat& fseat) const;

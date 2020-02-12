@@ -4,6 +4,15 @@
 
 namespace BoardSpace {
 
+static const map<RecFormat, string> fmt_ext{
+    { RecFormat::XQF, ".xqf" },
+    { RecFormat::BIN, ".bin" },
+    { RecFormat::JSON, ".json" },
+    { RecFormat::PGN_ICCS, ".pgn_iccs" },
+    { RecFormat::PGN_ZH, ".pgn_zh" },
+    { RecFormat::PGN_CC, ".pgn_cc" }
+};
+
 /* ===== Board start. ===== */
 Board::Board(const wstring& pieceChars)
     : bottomColor_{ PieceColor::RED }
@@ -39,9 +48,9 @@ const RowCol_pair_vector Board::getPutRowCols(const SPiece& piece) const
     return seats_->getPutRowCols(bottomColor_, piece);
 }
 
-const RowCol_pair_vector Board::getMoveRowCols(RowCol_pair rowcol_pair) const
+const RowCol_pair_vector Board::getCanMoveRowCols(RowCol_pair rowcol_pair) const
 {
-    return seats_->getMoveRowCols(bottomColor_, rowcol_pair);
+    return seats_->getCanMoveRowCols(bottomColor_, rowcol_pair);
 }
 
 const RowCol_pair_vector Board::getLiveRowCols(PieceColor color) const
@@ -187,40 +196,15 @@ const wstring FENTopieChars(const wstring& fen)
 
 const string getExtName(const RecFormat fmt)
 {
-    switch (fmt) {
-    case RecFormat::XQF:
-        return ".xqf";
-    case RecFormat::BIN:
-        return ".bin";
-    case RecFormat::JSON:
-        return ".json";
-    case RecFormat::PGN_ICCS:
-        return ".pgn_iccs";
-    case RecFormat::PGN_ZH:
-        return ".pgn_zh";
-    case RecFormat::PGN_CC:
-        return ".pgn_cc";
-    default:
-        return ".pgn_cc";
-    }
+    return fmt_ext.at(fmt);
 }
 
 RecFormat getRecFormat(const string& ext)
 {
-    if (ext == ".xqf")
-        return RecFormat::XQF;
-    else if (ext == ".bin")
-        return RecFormat::BIN;
-    else if (ext == ".json")
-        return RecFormat::JSON;
-    else if (ext == ".pgn_iccs")
-        return RecFormat::PGN_ICCS;
-    else if (ext == ".pgn_zh")
-        return RecFormat::PGN_ZH;
-    else if (ext == ".pgn_cc")
-        return RecFormat::PGN_CC;
-    else
-        return RecFormat::PGN_CC;
+    for (auto& fmtext : fmt_ext)
+        if (ext == fmtext.second)
+            return fmtext.first;
+    return RecFormat::PGN_CC;
 }
 
 const wstring testBoard()
@@ -246,7 +230,7 @@ const wstring testBoard()
                     << getRowColsStr(rowcols) << L'\n';
                 for (auto& rowcol_pair : rowcols)
                     wos << L"From:" << setfill(L'0') << setw(2) << SeatManager::getRowCol(rowcol_pair) << L" CanMovtTo: "
-                        << getRowColsStr(board.getMoveRowCols(rowcol_pair)) << L'\n';
+                        << getRowColsStr(board.getCanMoveRowCols(rowcol_pair)) << L'\n';
             }
         };
         __printCanMoveRowCols();
