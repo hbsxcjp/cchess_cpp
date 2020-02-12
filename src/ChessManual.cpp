@@ -7,6 +7,15 @@
 
 namespace ChessManualSpace {
 
+static const map<RecFormat, string> fmt_ext{
+    { RecFormat::XQF, ".xqf" },
+    { RecFormat::BIN, ".bin" },
+    { RecFormat::JSON, ".json" },
+    { RecFormat::PGN_ICCS, ".pgn_iccs" },
+    { RecFormat::PGN_ZH, ".pgn_zh" },
+    { RecFormat::PGN_CC, ".pgn_cc" }
+};
+
 wstring_convert<codecvt_utf8<wchar_t>> wscvt; // 未能成功调用
 
 static const wchar_t FENKey[] = L"FEN";
@@ -24,27 +33,9 @@ const wstring ChessManual::Move::iccs() const
     return wos.str();
 }
 
-shared_ptr<ChessManual::Move>& ChessManual::Move::addNext()
-{
-    auto nextMove = make_shared<Move>();
-    nextMove->setNextNo(nextNo_ + 1);
-    nextMove->setOtherNo(otherNo_);
-    nextMove->setPrev(weak_ptr<Move>(shared_from_this()));
-    return next_ = nextMove;
-}
-
-shared_ptr<ChessManual::Move>& ChessManual::Move::addOther()
-{
-    auto otherMove = make_shared<Move>();
-    otherMove->setNextNo(nextNo_);
-    otherMove->setOtherNo(otherNo_ + 1);
-    otherMove->setPrev(weak_ptr<Move>(shared_from_this()));
-    return other_ = otherMove;
-}
-
 shared_ptr<ChessManual::Move>& ChessManual::Move::addNext(const PRowCol_pair& prowcol_pair, const wstring& remark)
 {
-    auto nextMove = addNext();
+    auto nextMove = __addNext();
     nextMove->setPRowCol_pair(prowcol_pair);
     nextMove->setRemark(remark);
     return next_ = nextMove;
@@ -53,7 +44,7 @@ shared_ptr<ChessManual::Move>& ChessManual::Move::addNext(const PRowCol_pair& pr
 shared_ptr<ChessManual::Move>& ChessManual::Move::addOther(const PRowCol_pair& prowcol_pair, const wstring& remark)
 {
 
-    auto otherMove = addOther();
+    auto otherMove = __addOther();
     otherMove->setPRowCol_pair(prowcol_pair);
     otherMove->setRemark(remark);
     return other_ = otherMove;
@@ -79,6 +70,24 @@ const wstring ChessManual::Move::toString() const
         << L'@' << (eatPie_ ? eatPie_->name() : L'-') << L' ' << L'{' << remark() << L'}'
         << L" next:" << nextNo_ << L" other:" << otherNo_ << L" CC_Col:" << CC_ColNo_ << L'\n';
     return wos.str();
+}
+
+shared_ptr<ChessManual::Move>& ChessManual::Move::__addNext()
+{
+    auto nextMove = make_shared<Move>();
+    nextMove->setNextNo(nextNo_ + 1);
+    nextMove->setOtherNo(otherNo_);
+    nextMove->setPrev(weak_ptr<Move>(shared_from_this()));
+    return next_ = nextMove;
+}
+
+shared_ptr<ChessManual::Move>& ChessManual::Move::__addOther()
+{
+    auto otherMove = make_shared<Move>();
+    otherMove->setNextNo(nextNo_);
+    otherMove->setOtherNo(otherNo_ + 1);
+    otherMove->setPrev(weak_ptr<Move>(shared_from_this()));
+    return other_ = otherMove;
 }
 /* ===== ChessManual::Move end. ===== */
 
@@ -338,29 +347,21 @@ const wstring ChessManual::toString()
     return wos.str();
 }
 
-void ChessManual::__setBoardFromInfo()
+void ChessManual::__setFENplusFromFEN(const wstring& FEN, PieceColor color)
 {
-    board_->setPieces(FENTopieChars(FENplusToFEN(info_.at(FENKey))));
+    info_[FENKey] = FENToFENplus(FEN, color);
 }
 
-// 将用addNext代替
-void ChessManual::__setMoveFromStr(const SMove& move,
-    const wstring& str, RecFormat fmt, const wstring& remark) const
+void ChessManual::__setBoardFromInfo()
 {
-    if (fmt == RecFormat::PGN_ZH || fmt == RecFormat::PGN_CC)
-        move->setPRowCol_pair(board_->getPRowCol_pair(str));
-    else
-        move->setPRowCol_pair(make_pair(
-            make_pair(PieceManager::getRowFromICCSChar(str.at(1)), PieceManager::getColFromICCSChar(str.at(0))),
-            make_pair(PieceManager::getRowFromICCSChar(str.at(3)), PieceManager::getColFromICCSChar(str.at(2)))));
-    move->setRemark(remark);
+    board_->setBoard(FENTopieChars(FENplusToFEN(info_.at(FENKey))));
 }
 
 PRowCol_pair ChessManual::__getPRowCol_pair(const wstring& str, RecFormat fmt) const
 {
     if (fmt == RecFormat::PGN_ZH || fmt == RecFormat::PGN_CC)
         return board_->getPRowCol_pair(str);
-    else
+    else // RecFormat::PGN_ICCS
         return make_pair(
             make_pair(PieceManager::getRowFromICCSChar(str.at(1)), PieceManager::getColFromICCSChar(str.at(0))),
             make_pair(PieceManager::getRowFromICCSChar(str.at(3)), PieceManager::getColFromICCSChar(str.at(2))));
@@ -395,11 +396,6 @@ void ChessManual::__setMoveZhStrAndNums()
     movCount_ = remCount_ = remLenMax_ = maxRow_ = maxCol_ = 0;
     if (rootMove_->next())
         __setZhStrAndNums(rootMove_->next()); // 驱动函数
-}
-
-void ChessManual::__setFENplusFromFEN(const wstring& FEN, PieceColor color)
-{
-    info_[FENKey] = FENToFENplus(FEN, color);
 }
 
 const wstring ChessManual::__moveInfo() const
@@ -520,7 +516,6 @@ void ChessManual::__readXQF(istream& is)
     };
 
     //wcout << __LINE__ << L":" << pieceChars << endl;
-    //__setFENplusFromPieChars(pieceChars, rootMove_->getSeat_pair().first->piece()->color());
     __setBoardFromInfo();
 
     function<unsigned char(unsigned char, unsigned char)>
@@ -566,25 +561,22 @@ void ChessManual::__readXQF(istream& is)
         return wstr;
     };
 
-    //function<void(const SMove&)>
-    //  __readMove = [&](const SMove& move) {
-    function<void(SMove&, bool)> __readMove = [&](SMove& move, bool isOther) {
-        auto remark = __readDataAndGetRemark();
-        //# 一步棋的起点和终点有简单的加密计算，读入时需要还原
-        int fcolrow = __sub(frc, 0X18 + KeyXYf), tcolrow = __sub(trc, 0X20 + KeyXYt);
-        assert(fcolrow <= 89 && tcolrow <= 89);
+    function<void(SMove&, bool)>
+        __readMove = [&](SMove& move, bool isOther) {
+            auto remark = __readDataAndGetRemark();
+            //# 一步棋的起点和终点有简单的加密计算，读入时需要还原
+            int fcolrow = __sub(frc, 0X18 + KeyXYf), tcolrow = __sub(trc, 0X20 + KeyXYt);
+            assert(fcolrow <= 89 && tcolrow <= 89);
 
-        //wcout << __LINE__ << L":" << fcolrow << L' ' << tcolrow << remark << endl;
-        auto prowcol_pair = make_pair(make_pair(fcolrow % 10, fcolrow / 10), make_pair(tcolrow % 10, tcolrow / 10));
-        auto& newMove = (isOther ? addOtherMove(move, prowcol_pair, remark) : addNextMove(move, prowcol_pair, remark));
-        //wcout << __LINE__ << L":" << fcolrow << L' ' << tcolrow << remark << endl;
+            auto prowcol_pair = make_pair(make_pair(fcolrow % 10, fcolrow / 10), make_pair(tcolrow % 10, tcolrow / 10));
+            auto& newMove = (isOther ? addOtherMove(move, prowcol_pair, remark) : addNextMove(move, prowcol_pair, remark));
 
-        char ntag{ tag };
-        if (ntag & 0x80) //# 有左子树
-            __readMove(newMove, false);
-        if (ntag & 0x40) // # 有右子树
-            __readMove(newMove, true);
-    };
+            char ntag{ tag };
+            if (ntag & 0x80) //# 有左子树
+                __readMove(newMove, false);
+            if (ntag & 0x40) // # 有右子树
+                __readMove(newMove, true);
+        };
 
     is.seekg(1024);
     rootMove_->setRemark(__readDataAndGetRemark());
@@ -779,19 +771,14 @@ void ChessManual::__readMove_PGN_ICCSZH(wistream& wis, RecFormat fmt)
     for (wsregex_iterator wtiMove{ moveStr.begin(), moveStr.end(), moveReg }, wtiEnd{};
          wtiMove != wtiEnd; ++wtiMove) {
         if ((*wtiMove)[1].matched) {
-            move = preMove->addOther();
             preOtherMoves.push_back(preMove);
             if (isPGN_ZH)
                 undo(preMove);
+            move = addOtherMove(preMove, (*wtiMove)[3], fmt, (*wtiMove)[4]);
         } else
-            move = preMove->addNext();
-        __setMoveFromStr(move, (*wtiMove)[3], fmt, (*wtiMove)[4]);
-        //if (isPGN_ZH)
-        //wcout << (*wtiMove).str() << L'\n' << move->toString() << endl;
+            move = addNextMove(preMove, (*wtiMove)[3], fmt, (*wtiMove)[4]);
         if (isPGN_ZH)
             done(move); // 推进board的状态变化
-        //if (isPGN_ZH)
-        //wcout << board_->toString() << endl;
 
         if ((*wtiMove)[5].matched)
             for (int num = (*wtiMove).length(5); num > 0; --num) {
@@ -876,31 +863,33 @@ void ChessManual::__readMove_PGN_CC(wistream& wis)
             line.push_back(*moveit);
         moveLines.push_back(line);
     }
-    function<void(const SMove&, int, int)>
-        __readMove = [&](const SMove& move, int row, int col) {
+    function<void(SMove&, bool, int, int)>
+        __readMove = [&](SMove& move, bool isOther, int row, int col) {
             wstring zhStr{ moveLines[row][col] };
             if (regex_match(zhStr, moverg)) {
-                __setMoveFromStr(move, zhStr.substr(0, 4), RecFormat::PGN_CC,
-                    rems[L'(' + to_wstring(row) + L',' + to_wstring(col) + L')']);
+                wstring zhStr0{ zhStr.substr(0, 4) },
+                    remark{ rems[L'(' + to_wstring(row) + L',' + to_wstring(col) + L')'] };
+                auto& newMove = (isOther ? addOtherMove(move, zhStr0, RecFormat::PGN_CC, remark)
+                                         : addNextMove(move, zhStr0, RecFormat::PGN_CC, remark));
 
-                if (zhStr.back() == L'…')
-                    __readMove(move->addOther(), row, col + 1);
+                if (zhStr.back() == L'…') {
+                    int inc = 1;
+                    while (moveLines[row][col + inc].front() == L'…')
+                        ++inc;
+                    __readMove(newMove, true, row, col + inc);
+                }
                 if (int(moveLines.size()) - 1 > row
                     && moveLines[row + 1][col][0] != L'　') {
-                    done(move);
-                    __readMove(move->addNext(), row + 1, col);
-                    undo(move);
+                    done(newMove);
+                    __readMove(newMove, false, row + 1, col);
+                    undo(newMove);
                 }
-            } else if (moveLines[row][col][0] == L'…') {
-                while (moveLines[row][++col][0] == L'…')
-                    ;
-                __readMove(move, row, col);
             }
         };
 
     rootMove_->setRemark(rems[L"(0,0)"]);
     if (!moveLines.empty())
-        __readMove(rootMove_->addNext(), 1, 0);
+        __readMove(rootMove_, false, 1, 0);
 }
 
 void ChessManual::__writeMove_PGN_CC(wostream& wos) const
@@ -938,6 +927,19 @@ void ChessManual::__writeMove_PGN_CC(wostream& wos) const
     wos << remWss.str() << __moveInfo();
 }
 /* ===== ChessManual end. ===== */
+
+const string getExtName(const RecFormat fmt)
+{
+    return fmt_ext.at(fmt);
+}
+
+RecFormat getRecFormat(const string& ext)
+{
+    for (auto& fmtext : fmt_ext)
+        if (ext == fmtext.second)
+            return fmtext.first;
+    return RecFormat::PGN_CC;
+}
 
 void transDir(const string& dirfrom, const RecFormat fmt)
 {

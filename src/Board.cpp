@@ -4,22 +4,13 @@
 
 namespace BoardSpace {
 
-static const map<RecFormat, string> fmt_ext{
-    { RecFormat::XQF, ".xqf" },
-    { RecFormat::BIN, ".bin" },
-    { RecFormat::JSON, ".json" },
-    { RecFormat::PGN_ICCS, ".pgn_iccs" },
-    { RecFormat::PGN_ZH, ".pgn_zh" },
-    { RecFormat::PGN_CC, ".pgn_cc" }
-};
-
 /* ===== Board start. ===== */
 Board::Board(const wstring& pieceChars)
     : bottomColor_{ PieceColor::RED }
     , pieces_{ make_shared<Pieces>() }
     , seats_{ make_shared<Seats>() } // make_shared:动态分配内存，初始化对象并指向它
 {
-    setPieces(pieceChars);
+    setBoard(pieceChars);
 }
 
 bool Board::isKilled(PieceColor color) const
@@ -68,18 +59,18 @@ void Board::undoMove(PRowCol_pair prowcol_pair, const SPiece& eatPie) const
     seats_->undoMove(prowcol_pair, eatPie);
 }
 
-void Board::setPieces(const wstring& pieceChars)
+void Board::setBoard(const wstring& pieceChars)
 {
     if (pieceChars.empty())
         return;
     seats_->setBoardPieces(pieces_->getBoardPieces(pieceChars));
-    __setBottomSide();
+    bottomColor_ = seats_->getSideColor(true);
 }
 
 void Board::changeSide(const ChangeType ct)
 {
     seats_->changeSide(ct, pieces_);
-    __setBottomSide();
+    bottomColor_ = seats_->getSideColor(true);
 }
 
 const wstring Board::getPieceChars() const
@@ -127,11 +118,6 @@ const wstring Board::toString() const
     }
     wos << textBlankBoard;
     return wos.str();
-}
-
-void Board::__setBottomSide()
-{
-    bottomColor_ = seats_->getSideColor(true);
 }
 /* ===== Board end. ===== */
 
@@ -194,19 +180,6 @@ const wstring FENTopieChars(const wstring& fen)
     return pieceChars;
 }
 
-const string getExtName(const RecFormat fmt)
-{
-    return fmt_ext.at(fmt);
-}
-
-RecFormat getRecFormat(const string& ext)
-{
-    for (auto& fmtext : fmt_ext)
-        if (ext == fmtext.second)
-            return fmtext.first;
-    return RecFormat::PGN_CC;
-}
-
 const wstring testBoard()
 {
     wostringstream wos{};
@@ -215,7 +188,7 @@ const wstring testBoard()
              wstring{ L"5a3/4ak2r/6R2/8p/9/9/9/B4N2B/4K4/3c5" } }) {
         auto pieceChars = FENTopieChars(fen);
 
-        board.setPieces(pieceChars);
+        board.setBoard(pieceChars);
         wos << "     fen:" << fen
             << "\nchar_FEN:" << pieCharsToFEN(pieceChars)
             << "\ngetChars:" << pieceChars

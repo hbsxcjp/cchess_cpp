@@ -14,21 +14,18 @@ private:
     // 着法节点类
     class Move : public enable_shared_from_this<Move> {
     public:
-        Move() = default;
-
         int frowcol() const;
         int trowcol() const;
+        
         PRowCol_pair getPRowCol_pair() const { return prowcol_pair_; }
         const wstring iccs() const;
-        const wstring zh() const { return zhStr_; }
+        const wstring& zh() const { return zhStr_; }
         const wstring& remark() const { return remark_; }
         const SPiece& eatPie() const { return eatPie_; }
         const SMove& next() const { return next_; }
         const SMove& other() const { return other_; }
         const SMove prev() const { return prev_.lock(); }
 
-        SMove& addNext();
-        SMove& addOther();
         SMove& addNext(const PRowCol_pair& prowcol_pair, const wstring& remark);
         SMove& addOther(const PRowCol_pair& prowcol_pair, const wstring& remark);
 
@@ -63,6 +60,9 @@ private:
         SMove next_{}, other_{};
 
         int nextNo_{ 0 }, otherNo_{ 0 }, CC_ColNo_{ 0 }; // CC_ColNo_:图中列位置（需在ChessManual::setMoves确定）
+
+        SMove& __addNext();
+        SMove& __addOther();
     };
 
 public:
@@ -104,7 +104,6 @@ private:
     void __setFENplusFromFEN(const wstring& FEN, PieceColor color);
     void __setBoardFromInfo();
 
-    void __setMoveFromStr(const SMove& move, const wstring& str, RecFormat fmt, const wstring& remark) const;
     PRowCol_pair __getPRowCol_pair(const wstring& str, RecFormat fmt) const;
     void __setMoveZhStrAndNums();
 
@@ -127,6 +126,9 @@ private:
     void __readMove_PGN_CC(wistream& wis);
     void __writeMove_PGN_CC(wostream& wos) const;
 };
+
+const string getExtName(const RecFormat fmt);
+RecFormat getRecFormat(const string& ext);
 
 void transDir(const string& dirfrom, const RecFormat fmt);
 void testTransDir(int fd, int td, int ff, int ft, int tf, int tt);

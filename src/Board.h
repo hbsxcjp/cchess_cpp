@@ -23,7 +23,7 @@ public:
     const SPiece doneMove(PRowCol_pair prowcol_pair) const;
     void undoMove(PRowCol_pair prowcol_pair, const SPiece& eatPie) const;
 
-    void setPieces(const wstring& pieceChars);
+    void setBoard(const wstring& pieceChars);
     void changeSide(const ChangeType ct);
 
     const wstring getPieceChars() const;
@@ -33,17 +33,12 @@ private:
     PieceColor bottomColor_;
     shared_ptr<Pieces> pieces_;
     shared_ptr<Seats> seats_;
-
-    void __setBottomSide();
 };
 
 const wstring FENplusToFEN(const wstring& FENplus);
 const wstring FENToFENplus(const wstring& FEN, PieceColor color);
 const wstring pieCharsToFEN(const wstring& pieceChars); // 便利函数，下同
 const wstring FENTopieChars(const wstring& fen);
-
-const string getExtName(const RecFormat fmt);
-RecFormat getRecFormat(const string& ext);
 
 const wstring testBoard();
 }
