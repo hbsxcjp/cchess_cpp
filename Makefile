@@ -20,9 +20,9 @@ $(OBJS): $(OP)%.o : $(SP)%.cpp
 $(JSONOBJ): $(OP)%.o : $(SP)%.cpp
 	$(CC) $(CFLAGS) -o $@ -c $<
 
-$(OBJS): $(SP)ChessType.h
-
 $(SP)%.cpp: $(SP)%.h
+
+$(SP)%.h: $(SP)ChessType.h
 
 #以下依赖条件替换为所有.c文件，通过-M预处理发现所有.h文件的变动
 #dependencies: $(OBJS:.o=.cpp)
