@@ -1,5 +1,6 @@
 ﻿#include "Board.h"
 #include "ChessManual.h"
+#include "Console.h"
 #include "Tools.h"
 
 #include <chrono>
@@ -22,7 +23,7 @@ int main(int argc, char const* argv[])
     wofs << testBoard();
     wofs << testChessmanual();
     wofs.close();
-    //*
+    /*
     if (argc == 7)
         testTransDir(std::stoi(argv[1]), std::stoi(argv[2]),
             std::stoi(argv[3]), std::stoi(argv[4]), std::stoi(argv[5]), std::stoi(argv[6]));
@@ -36,6 +37,8 @@ int main(int argc, char const* argv[])
         //testTransDir(0, 2, 2, 3, 1, 5);
     }
     //*/
+
+    ConsoleSpace::view();
 
     auto time_d = steady_clock::now() - time0;
     wcout << L"use time: " << duration_cast<milliseconds>(time_d).count() / 1000.0 << L"s\n";
