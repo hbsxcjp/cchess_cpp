@@ -38,7 +38,7 @@ int main(int argc, char const* argv[])
     }
     //*/
 
-    ConsoleSpace::view();
+    ConsoleSpace::doView();
 
     auto time_d = steady_clock::now() - time0;
     wcout << L"use time: " << duration_cast<milliseconds>(time_d).count() / 1000.0 << L"s\n";
