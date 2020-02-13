@@ -271,6 +271,7 @@ void ConsoleSpace::view()
 	// 关闭标准输出设备句柄
 	CloseHandle(hOut); 
     //*/
+
     /*
     setlocale(LC_ALL, "C");
 	char strTitle[255];
@@ -295,12 +296,12 @@ void ConsoleSpace::view()
     /*
 	hOut = GetStdHandle(STD_OUTPUT_HANDLE); // 获取标准输出设备句柄
 	//SetConsoleOutputCP(437); // 设置代码页，这里如果设置成936（简体中文），那么程序会怎样？那样的话，将画不出边框。
-	SetConsoleOutputCP(936); // 设置代码页，这里如果设置成936（简体中文），那么程序会怎样？那样的话，将画不出边框。
+	//SetConsoleOutputCP(936); // 设置代码页，这里如果设置成936（简体中文），那么程序会怎样？那样的话，将画不出边框。
 	ShadowWindowLine("Display a line of words, and center the window with shadow.");
 	CloseHandle(hOut); // 关闭标准输出设备句柄
     //*/
 
-    /*
+    //*
 	hOut = GetStdHandle(STD_OUTPUT_HANDLE); // 获取标准输出设备句柄
 	WORD att = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY | BACKGROUND_BLUE;// 背景是蓝色，文本颜色是黄色
 	SetConsoleTextAttribute(hOut, att);
