@@ -15,7 +15,7 @@ namespace ConsoleSpace {
 #define COLOR_PAIR_NUM(theme, area) ((theme) | (area))
 #define THEMECOLOR(theme, area) COLOR_PAIR(COLOR_PAIR_NUM(theme, area))
 
-// ¿ØÖÆÌ¨½¹µãÇøÓòÀàĞÍ
+// æ§åˆ¶å°ç„¦ç‚¹åŒºåŸŸç±»å‹
 typedef enum {
     MENUA,
     BOARDA,
@@ -24,17 +24,17 @@ typedef enum {
     STATUSA
 } FocusArea;
 
-// ÇøÓòÖ÷ÌâÑÕÉ«ÅäÖÃÀàĞÍ
+// åŒºåŸŸä¸»é¢˜é¢œè‰²é…ç½®ç±»å‹
 typedef enum {
     SIMPLE = 0x10,
     SHOWY = 0x20,
     HIGHLIGHT = 0x30
 } Theme;
 
-// ²Ëµ¥ÃüÁî
+// èœå•å‘½ä»¤
 typedef void (*MENU_FUNC)(void);
 
-// ²Ëµ¥½á¹¹
+// èœå•ç»“æ„
 typedef struct Menu_ {
     wchar_t name[12]; /* item label */
     MENU_FUNC func; /* (pointer to) function */
@@ -43,7 +43,7 @@ typedef struct Menu_ {
     int colIndex, rowIndex;
 } Menu;
 
-// ²Ëµ¥³õÊ¼Êı¾İ½á¹¹
+// èœå•åˆå§‹æ•°æ®ç»“æ„
 typedef struct MenuData_ {
     wchar_t name[12]; /* item label */
     MENU_FUNC func; /* (pointer to) function */

@@ -4,10 +4,12 @@
 #include <conio.h>
 #include <stdio.h>
 #include <windows.h>
+#define UNICODE
 
 using namespace ConsoleSpace;
 
 static wchar_t PROGRAMNAME[] = L"中国象棋 ";
+HANDLE hIn;
 HANDLE hOut;
 void DrawBox(bool bSingle, SMALL_RECT rc); // 函数功能：画边框
 
@@ -154,7 +156,7 @@ void ClearScreen(void)
     FillConsoleOutputCharacter(hOut, ' ', size, home, NULL);
 }
 
-HANDLE hIn;
+//HANDLE hIn;
 void CharWindow(char ch, SMALL_RECT rc); // 将ch输入到指定的窗口中
 void ControlStatus(DWORD state); // 在最后一行显示控制键的状态
 void DeleteTopLine(SMALL_RECT rc); // 删除指定窗口中最上面的行并滚动
@@ -238,44 +240,286 @@ void DispMousePos(COORD pos) // 在第24行显示鼠标位置
     SetConsoleTextAttribute(hOut, bInfo.wAttributes); // 恢复原来的属性
     SetConsoleCursorPosition(hOut, bInfo.dwCursorPosition); // 恢复原来的光标位置
 }
+HANDLE hStdout; 
+int readAndWirte(void) 
+{ 
+    HANDLE hStdout, hNewScreenBuffer; 
+    SMALL_RECT srctReadRect; 
+    SMALL_RECT srctWriteRect; 
+    CHAR_INFO chiBuffer[160]; // [2][80]; 
+    COORD coordBufSize; 
+    COORD coordBufCoord; 
+    BOOL fSuccess; 
+ 
+    // Get a handle to the STDOUT screen buffer to copy from and 
+    // create a new screen buffer to copy to. 
+ 
+    hStdout = GetStdHandle(STD_OUTPUT_HANDLE); 
+    hNewScreenBuffer = CreateConsoleScreenBuffer( 
+       GENERIC_READ |           // read/write access 
+       GENERIC_WRITE, 
+       FILE_SHARE_READ | 
+       FILE_SHARE_WRITE,        // shared 
+       NULL,                    // default security attributes 
+       CONSOLE_TEXTMODE_BUFFER, // must be TEXTMODE 
+       NULL);                   // reserved; must be NULL 
+    if (hStdout == INVALID_HANDLE_VALUE || 
+            hNewScreenBuffer == INVALID_HANDLE_VALUE) 
+    {
+        printf("CreateConsoleScreenBuffer failed - (%d)\n", GetLastError()); 
+        return 1;
+    }
+ 
+    // Make the new screen buffer the active screen buffer. 
+ 
+    if (! SetConsoleActiveScreenBuffer(hNewScreenBuffer) ) 
+    {
+        printf("SetConsoleActiveScreenBuffer failed - (%d)\n", GetLastError()); 
+        return 1;
+    }
+ 
+    // Set the source rectangle. 
+ 
+    srctReadRect.Top = 0;    // top left: row 0, col 0 
+    srctReadRect.Left = 0; 
+    srctReadRect.Bottom = 1; // bot. right: row 1, col 79 
+    srctReadRect.Right = 79; 
+ 
+    // The temporary buffer size is 2 rows x 80 columns. 
+ 
+    coordBufSize.Y = 2; 
+    coordBufSize.X = 80; 
+ 
+    // The top left destination cell of the temporary buffer is 
+    // row 0, col 0. 
+ 
+    coordBufCoord.X = 0; 
+    coordBufCoord.Y = 0; 
+ 
+    // Copy the block from the screen buffer to the temp. buffer. 
+ 
+    fSuccess = ReadConsoleOutput( 
+       hStdout,        // screen buffer to read from 
+       chiBuffer,      // buffer to copy into 
+       coordBufSize,   // col-row size of chiBuffer 
+       coordBufCoord,  // top left dest. cell in chiBuffer 
+       &srctReadRect); // screen buffer source rectangle 
+    if (! fSuccess) 
+    {
+        printf("ReadConsoleOutput failed - (%d)\n", GetLastError()); 
+        return 1;
+    }
+ 
+    // Set the destination rectangle. 
+ 
+    srctWriteRect.Top = 10;    // top lt: row 10, col 0 
+    srctWriteRect.Left = 0; 
+    srctWriteRect.Bottom = 11; // bot. rt: row 11, col 79 
+    srctWriteRect.Right = 79; 
+ 
+    // Copy from the temporary buffer to the new screen buffer. 
+ 
+    fSuccess = WriteConsoleOutput( 
+        hNewScreenBuffer, // screen buffer to write to 
+        chiBuffer,        // buffer to copy from 
+        coordBufSize,     // col-row size of chiBuffer 
+        coordBufCoord,    // top left src cell in chiBuffer 
+        &srctWriteRect);  // dest. screen buffer rectangle 
+    if (! fSuccess) 
+    {
+        printf("WriteConsoleOutput failed - (%d)\n", GetLastError()); 
+        return 1;
+    }
+    Sleep(5000); 
+ 
+    // Restore the original active screen buffer. 
+ 
+    if (! SetConsoleActiveScreenBuffer(hStdout)) 
+    {
+        printf("SetConsoleActiveScreenBuffer failed - (%d)\n", GetLastError()); 
+        return 1;
+    }
+
+    return 0;
+}
+
+void cls( HANDLE hConsole )
+{
+   COORD coordScreen = { 0, 0 };    // home for the cursor 
+   DWORD cCharsWritten;
+   CONSOLE_SCREEN_BUFFER_INFO csbi; 
+   DWORD dwConSize;
+
+// Get the number of character cells in the current buffer. 
+
+   if( !GetConsoleScreenBufferInfo( hConsole, &csbi ))
+   {
+      return;
+   }
+
+   dwConSize = csbi.dwSize.X * csbi.dwSize.Y;
+
+   // Fill the entire screen with blanks.
+
+   if( !FillConsoleOutputCharacter( hConsole,        // Handle to console screen buffer 
+                                    (TCHAR) ' ',     // Character to write to the buffer
+                                    dwConSize,       // Number of cells to write 
+                                    coordScreen,     // Coordinates of first cell 
+                                    &cCharsWritten ))// Receive number of characters written
+   {
+      return;
+   }
+
+   // Get the current text attribute.
+
+   if( !GetConsoleScreenBufferInfo( hConsole, &csbi ))
+   {
+      return;
+   }
+
+   // Set the buffer's attributes accordingly.
+
+   if( !FillConsoleOutputAttribute( hConsole,         // Handle to console screen buffer 
+                                    csbi.wAttributes, // Character attributes to use
+                                    dwConSize,        // Number of cells to set attribute 
+                                    coordScreen,      // Coordinates of first cell 
+                                    &cCharsWritten )) // Receive number of characters written
+   {
+      return;
+   }
+
+   // Put the cursor at its home coordinates.
+
+   SetConsoleCursorPosition( hConsole, coordScreen );
+}
+
+int ScrollByAbsoluteCoord(int iRows)
+{
+    CONSOLE_SCREEN_BUFFER_INFO csbiInfo; 
+    SMALL_RECT srctWindow; 
+ 
+    // Get the current screen buffer size and window position. 
+ 
+    if (! GetConsoleScreenBufferInfo(hStdout, &csbiInfo)) 
+    {
+        printf("GetConsoleScreenBufferInfo (%d)\n", GetLastError()); 
+        return 0;
+    }
+ 
+    // Set srctWindow to the current window size and location. 
+ 
+    srctWindow = csbiInfo.srWindow; 
+ 
+    // Check whether the window is too close to the screen buffer top
+ 
+    if ( srctWindow.Top >= iRows ) 
+    { 
+        srctWindow.Top -= (SHORT)iRows;     // move top up
+        srctWindow.Bottom -= (SHORT)iRows;  // move bottom up
+
+        if (! SetConsoleWindowInfo( 
+                   hStdout,          // screen buffer handle 
+                   TRUE,             // absolute coordinates 
+                   &srctWindow))     // specifies new location 
+        {
+            printf("SetConsoleWindowInfo (%d)\n", GetLastError()); 
+            return 0;
+        }
+        return iRows;
+    }
+    else
+    {
+        printf("\nCannot scroll; the window is too close to the top.\n");
+        return 0;
+    }
+}
+
+int ScrollByRelativeCoord(int iRows)
+{
+    CONSOLE_SCREEN_BUFFER_INFO csbiInfo; 
+    SMALL_RECT srctWindow; 
+
+    // Get the current screen buffer window position. 
+ 
+    if (! GetConsoleScreenBufferInfo(hStdout, &csbiInfo)) 
+    {
+        printf("GetConsoleScreenBufferInfo (%d)\n", GetLastError()); 
+        return 0;
+    }
+ 
+    // Check whether the window is too close to the screen buffer top
+ 
+    if (csbiInfo.srWindow.Top >= iRows) 
+    { 
+        srctWindow.Top =- (SHORT)iRows;     // move top up
+        srctWindow.Bottom =- (SHORT)iRows;  // move bottom up 
+        srctWindow.Left = 0;         // no change 
+        srctWindow.Right = 0;        // no change 
+ 
+        if (! SetConsoleWindowInfo( 
+                   hStdout,          // screen buffer handle 
+                   FALSE,            // relative coordinates
+                   &srctWindow))     // specifies new location 
+        {
+            printf("SetConsoleWindowInfo (%d)\n", GetLastError()); 
+            return 0;
+        }
+        return iRows;
+    }
+    else
+    {
+        printf("\nCannot scroll; the window is too close to the top.\n");
+        return 0;
+    }
+}
+
 
 void ConsoleSpace::doView()
 {
     CONSOLE_SCREEN_BUFFER_INFO bInfo; // 存储窗口信息
     COORD pos = { 0, 0 };
-    DWORD written;
+    PDWORD pwritten{};
 
-    // 获取标准输出设备句柄
-    hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-    // 获取窗口信息
-    GetConsoleScreenBufferInfo(hOut, &bInfo);
+    hIn = GetStdHandle(STD_INPUT_HANDLE); // 获取标准输入设备句柄
+    hOut = GetStdHandle(STD_OUTPUT_HANDLE); // 获取标准输出设备句柄
+    SetConsoleCP(936);
+    SetConsoleOutputCP(936);
+    //SetConsoleMode(hIn, ENABLE_PROCESSED_INPUT);
+
+    GetConsoleScreenBufferInfo(hOut, &bInfo); // 获取窗口信息
     SetConsoleTitleW(PROGRAMNAME); // 设置窗口标题
-
-    _getch();
+    WORD att = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY | BACKGROUND_BLUE; // 背景是蓝色，文本颜色是黄色
+    SetConsoleTextAttribute(hOut, att);
+    //_getch();
     // 向窗口中填充字符以获得清屏的效果
-    //FillConsoleOutputCharacterW(hOut, L' ', bInfo.dwSize.X * bInfo.dwSize.Y, pos, &written);
-    // 关闭标准输出设备句柄
-    CloseHandle(hOut);
+    FillConsoleOutputCharacterW(hOut, L' ', bInfo.dwSize.X * bInfo.dwSize.Y, pos, pwritten);
+
+    ClearScreen();
+    _getch();
+    SetConsoleTextAttribute(hOut, bInfo.wAttributes); // 恢复属性
+    ClearScreen();
+    _getch();
+    CloseHandle(hOut); // 关闭标准输出设备句柄
 }
 
 void ConsoleSpace::view0()
 {
     /*
-	CONSOLE_SCREEN_BUFFER_INFO bInfo; // 存储窗口信息
-	COORD pos = {0, 0};
-	// 获取标准输出设备句柄
-	hOut = GetStdHandle(STD_OUTPUT_HANDLE); 
-	// 获取窗口信息
-	GetConsoleScreenBufferInfo(hOut, &bInfo ); 
-	printf("\n\nThe soul selects her own society\n");
-	printf("Then shuts the door\n");
-	printf("On her devine majority\n");
-	printf("Obtrude no more\n\n");
-	_getch();
-	// 向窗口中填充字符以获得清屏的效果
-	FillConsoleOutputCharacter(hOut,'-', bInfo.dwSize.X * bInfo.dwSize.Y, pos, NULL);
-	// 关闭标准输出设备句柄
-	CloseHandle(hOut); 
+    CONSOLE_SCREEN_BUFFER_INFO bInfo; // 存储窗口信息
+    COORD pos = {0, 0};
+    // 获取标准输出设备句柄
+    hOut = GetStdHandle(STD_OUTPUT_HANDLE); 
+    // 获取窗口信息
+    GetConsoleScreenBufferInfo(hOut, &bInfo ); 
+    printf("\n\nThe soul selects her own society\n");
+    printf("Then shuts the door\n");
+    printf("On her devine majority\n");
+    printf("Obtrude no more\n\n");
+    _getch();
+    // 向窗口中填充字符以获得清屏的效果
+    FillConsoleOutputCharacter(hOut,'-', bInfo.dwSize.X * bInfo.dwSize.Y, pos, NULL);
+    // 关闭标准输出设备句柄
+    CloseHandle(hOut); 
     //*/
 
     /*
@@ -311,89 +555,89 @@ void ConsoleSpace::view0()
     //*/
 
     /*
-	hOut = GetStdHandle(STD_OUTPUT_HANDLE); // 获取标准输出设备句柄
-	WORD att = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY | BACKGROUND_BLUE;// 背景是蓝色，文本颜色是黄色
-	SetConsoleTextAttribute(hOut, att);
-	ClearScreen();
-	printf("\n\nThe soul selects her own society\n");
-	printf("Then shuts the door;\n");
-	printf("On her devine majority;\n");
-	printf("Obtrude no more.\n\n");
-	COORD endPos = {0, 15};
-	SetConsoleCursorPosition(hOut, endPos); // 设置光标位置
-	SMALL_RECT rc = {0, 2, 40, 5};
-	_getch();
-	MoveText(10, 5, rc);
-	_getch();
-	DeleteLine(5);
-	CloseHandle(hOut); // 关闭标准输出设备句柄
+    hOut = GetStdHandle(STD_OUTPUT_HANDLE); // 获取标准输出设备句柄
+    WORD att = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY | BACKGROUND_BLUE;// 背景是蓝色，文本颜色是黄色
+    SetConsoleTextAttribute(hOut, att);
+    ClearScreen();
+    printf("\n\nThe soul selects her own society\n");
+    printf("Then shuts the door;\n");
+    printf("On her devine majority;\n");
+    printf("Obtrude no more.\n\n");
+    COORD endPos = {0, 15};
+    SetConsoleCursorPosition(hOut, endPos); // 设置光标位置
+    SMALL_RECT rc = {0, 2, 40, 5};
+    _getch();
+    MoveText(10, 5, rc);
+    _getch();
+    DeleteLine(5);
+    CloseHandle(hOut); // 关闭标准输出设备句柄
     //*/
 
     /*
-	hOut = GetStdHandle(STD_OUTPUT_HANDLE); // 获取标准输出设备句柄
-	hIn = GetStdHandle(STD_INPUT_HANDLE); // 获取标准输入设备句柄
-	WORD att = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY | BACKGROUND_BLUE ; // 背景是蓝色，文本颜色是黄色
-	SetConsoleTextAttribute(hOut, att);
-	ClearScreen(); // 清屏
-	INPUT_RECORD keyRec;
-	DWORD state = 0, res;
-	char ch;
-	SMALL_RECT rc = {20, 2, 40, 12};
-	DrawBox(false, rc);
-	COORD pos = {rc.Left+1, rc.Top+1};
-	SetConsoleCursorPosition(hOut, pos); // 设置光标位置
-	for(;;) // 循环
-	{
-		ReadConsoleInput(hIn, &keyRec, 1, &res);
-		if (state != keyRec.Event.KeyEvent.dwControlKeyState)
-		{
-			state = keyRec.Event.KeyEvent.dwControlKeyState;
-			ControlStatus(state);
-		}
-		if (keyRec.EventType == KEY_EVENT)
-		{
-			if (keyRec.Event.KeyEvent.wVirtualKeyCode == VK_ESCAPE) 
-				break;
-			// 按ESC键退出循环
-			if (keyRec.Event.KeyEvent.bKeyDown)
-			{
-				ch = keyRec.Event.KeyEvent.uChar.AsciiChar;
-				CharWindow(ch, rc);
-			}
-		}
-	}
-	pos.X = 0; pos.Y = 0;
-	SetConsoleCursorPosition(hOut, pos); // 设置光标位置
-	CloseHandle(hOut); // 关闭标准输出设备句柄
-	CloseHandle(hIn); // 关闭标准输入设备句柄
+    hOut = GetStdHandle(STD_OUTPUT_HANDLE); // 获取标准输出设备句柄
+    hIn = GetStdHandle(STD_INPUT_HANDLE); // 获取标准输入设备句柄
+    WORD att = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY | BACKGROUND_BLUE ; // 背景是蓝色，文本颜色是黄色
+    SetConsoleTextAttribute(hOut, att);
+    ClearScreen(); // 清屏
+    INPUT_RECORD keyRec;
+    DWORD state = 0, res;
+    char ch;
+    SMALL_RECT rc = {20, 2, 40, 12};
+    DrawBox(false, rc);
+    COORD pos = {rc.Left+1, rc.Top+1};
+    SetConsoleCursorPosition(hOut, pos); // 设置光标位置
+    for(;;) // 循环
+    {
+        ReadConsoleInput(hIn, &keyRec, 1, &res);
+        if (state != keyRec.Event.KeyEvent.dwControlKeyState)
+        {
+            state = keyRec.Event.KeyEvent.dwControlKeyState;
+            ControlStatus(state);
+        }
+        if (keyRec.EventType == KEY_EVENT)
+        {
+            if (keyRec.Event.KeyEvent.wVirtualKeyCode == VK_ESCAPE) 
+                break;
+            // 按ESC键退出循环
+            if (keyRec.Event.KeyEvent.bKeyDown)
+            {
+                ch = keyRec.Event.KeyEvent.uChar.AsciiChar;
+                CharWindow(ch, rc);
+            }
+        }
+    }
+    pos.X = 0; pos.Y = 0;
+    SetConsoleCursorPosition(hOut, pos); // 设置光标位置
+    CloseHandle(hOut); // 关闭标准输出设备句柄
+    CloseHandle(hIn); // 关闭标准输入设备句柄
     //*/
 
     /*
-	hOut = GetStdHandle(STD_OUTPUT_HANDLE); // 获取标准输出设备句柄
-	hIn = GetStdHandle(STD_INPUT_HANDLE); // 获取标准输入设备句柄
-	WORD att = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY | BACKGROUND_BLUE ;
-	// 背景是蓝色，文本颜色是黄色
-	SetConsoleTextAttribute(hOut, att);
-	ClearScreen(); // 清屏
-	INPUT_RECORD mouseRec;
-	DWORD state = 0, res;
-	COORD pos = {0, 0};
-	for(;;) // 循环
-	{
-		ReadConsoleInput(hIn, &mouseRec, 1, &res);
-		if (mouseRec.EventType == MOUSE_EVENT)
-		{
-			if (mouseRec.Event.MouseEvent.dwEventFlags == DOUBLE_CLICK) 
-				break; // 双击鼠标退出循环		
-			pos = mouseRec.Event.MouseEvent.dwMousePosition;
-			DispMousePos(pos);
-			if (mouseRec.Event.MouseEvent.dwButtonState == FROM_LEFT_1ST_BUTTON_PRESSED)
-				FillConsoleOutputCharacter(hOut, 'A', 1, pos, NULL); 
-		}
-	} 
-	pos.X = pos.Y = 0;
-	SetConsoleCursorPosition(hOut, pos); // 设置光标位置
-	CloseHandle(hOut); // 关闭标准输出设备句柄
-	CloseHandle(hIn); // 关闭标准输入设备句柄
+    hOut = GetStdHandle(STD_OUTPUT_HANDLE); // 获取标准输出设备句柄
+    hIn = GetStdHandle(STD_INPUT_HANDLE); // 获取标准输入设备句柄
+    WORD att = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY | BACKGROUND_BLUE ;
+    // 背景是蓝色，文本颜色是黄色
+    SetConsoleTextAttribute(hOut, att);
+    ClearScreen(); // 清屏
+    INPUT_RECORD mouseRec;
+    DWORD state = 0, res;
+    COORD pos = {0, 0};
+    for(;;) // 循环
+    {
+        ReadConsoleInput(hIn, &mouseRec, 1, &res);
+        if (mouseRec.EventType == MOUSE_EVENT)
+        {
+            if (mouseRec.Event.MouseEvent.dwEventFlags == DOUBLE_CLICK) 
+                break; // 双击鼠标退出循环		
+            pos = mouseRec.Event.MouseEvent.dwMousePosition;
+            DispMousePos(pos);
+            if (mouseRec.Event.MouseEvent.dwButtonState == FROM_LEFT_1ST_BUTTON_PRESSED)
+                FillConsoleOutputCharacter(hOut, 'A', 1, pos, NULL); 
+        }
+    } 
+    pos.X = pos.Y = 0;
+    SetConsoleCursorPosition(hOut, pos); // 设置光标位置
+    CloseHandle(hOut); // 关闭标准输出设备句柄
+    CloseHandle(hIn); // 关闭标准输入设备句柄
     //*/
 }
