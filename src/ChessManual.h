@@ -1,4 +1,4 @@
-﻿#ifndef CHESSMANUAL_H
+#ifndef CHESSMANUAL_H
 #define CHESSMANUAL_H
 // 中国象棋棋盘布局类型 by-cjp
 
@@ -16,7 +16,7 @@ private:
     public:
         int frowcol() const;
         int trowcol() const;
-        
+
         PRowCol_pair getPRowCol_pair() const { return prowcol_pair_; }
         const wstring iccs() const;
         const wstring& zh() const { return zhStr_; }
@@ -93,6 +93,10 @@ public:
     int getMaxRow() const { return maxRow_; }
     int getMaxCol() const { return maxCol_; }
 
+    bool isBottomSide(PieceColor color) const;
+    const wstring getPieceChars() const;
+    const wstring getBoardStr() const;
+    const wstring getMoveStr() const;
     const wstring toString();
 
 private:

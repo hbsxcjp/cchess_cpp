@@ -1,4 +1,4 @@
-﻿#include "Seat.h"
+#include "Seat.h"
 #include "Piece.h"
 
 namespace SeatSpace {

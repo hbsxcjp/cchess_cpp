@@ -1,4 +1,4 @@
-﻿#include "Board.h"
+#include "Board.h"
 #include "ChessManual.h"
 #include "Console.h"
 #include "Tools.h"
@@ -17,12 +17,14 @@ int main(int argc, char const* argv[])
 
     auto time0 = steady_clock::now();
 
+    /*
     string fname = "a.txt";
     wofstream wofs(fname);
     //wcout = wofs;
     wofs << testBoard();
     wofs << testChessmanual();
     wofs.close();
+    //*/
     /*
     if (argc == 7)
         testTransDir(std::stoi(argv[1]), std::stoi(argv[2]),
@@ -38,7 +40,10 @@ int main(int argc, char const* argv[])
     }
     //*/
 
-    ConsoleSpace::doView();
+    using namespace ConsoleSpace;
+    Console console = Console();
+    console.doView("01.xqf");
+    //console.doView();
 
     auto time_d = steady_clock::now() - time0;
     wcout << L"use time: " << duration_cast<milliseconds>(time_d).count() / 1000.0 << L"s\n";

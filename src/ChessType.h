@@ -1,4 +1,4 @@
-﻿#ifndef CHESSTYPE_H
+#ifndef CHESSTYPE_H
 #define CHESSTYPE_H
 
 #include <algorithm>

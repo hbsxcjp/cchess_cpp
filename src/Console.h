@@ -1,19 +1,15 @@
 #ifndef CONSOLE_H
 #define CONSOLE_H
 
-//#include "ChessType.h"
+#include "ChessType.h"
+#include <conio.h>
+#include <stdio.h>
+#include <windows.h>
+#define UNICODE
 
-namespace ConsoleSpace {
-
-#define MAXSTRLEN 256
-#define MENUNUM 4
-#define MENULEVEL 10
-#define MENUWIDTH 9
 #define KEY_ESC 0x1b /* Escape */
 
-#define COLOR_V(num) ((short)((num) / 255.0 * 1000.0))
-#define COLOR_PAIR_NUM(theme, area) ((theme) | (area))
-#define THEMECOLOR(theme, area) COLOR_PAIR(COLOR_PAIR_NUM(theme, area))
+namespace ConsoleSpace {
 
 // 控制台焦点区域类型
 typedef enum {
@@ -36,23 +32,48 @@ typedef void (*MENU_FUNC)(void);
 
 // 菜单结构
 typedef struct Menu_ {
-    wchar_t name[12]; /* item label */
-    MENU_FUNC func; /* (pointer to) function */
-    wchar_t desc[50]; /* function description */
-    struct Menu_ *preMenu, *nextMenu, *otherMenu;
-    int colIndex, rowIndex;
+    wstring name, desc;
+    MENU_FUNC func{}; // 菜单关联的命令函数，如有子菜单则应为空
+    struct Menu_ *preMenu{}, *brotherMenu{}, *childMenu{};
+    int brotherIndex{}, childIndex{};
 } Menu;
 
 // 菜单初始数据结构
 typedef struct MenuData_ {
-    wchar_t name[12]; /* item label */
-    MENU_FUNC func; /* (pointer to) function */
-    wchar_t desc[50]; /* function description */
+    wstring name, desc;
+    MENU_FUNC func;
 } MenuData;
 
-void doView(void);
+class Console {
+public:
+    Console();
 
-void view0();
+    void doView(const string& fileName = string{});
+
+    ~Console();
+
+private:
+    HANDLE hIn_, hOut_;
+    PDWORD pwritten;
+    Menu* rootMenu_;
+
+    void __writeBoard(const ChessManual& cm);
+    void __writeMove(const wstring& moveStr);
+
+    void __initArea();
+    void __initMenu();
+    void __delMenu(Menu* menu);
+};
+
+void writeCharBuf(CHAR_INFO* charBuf, COORD bufSize, COORD bufCoord, SMALL_RECT& writeRect);
+
+void setCharBuf(CHAR_INFO* charBuf, COORD charCoord, const wchar_t* wchars, WORD attr);
+
+// 使用公用变量，获取用于屏幕显示的字符串（经试验，只有在制表符字符后插入空格，才能显示正常）
+wchar_t* getShowWstr(const wchar_t* srcWstr);
+
+// 取得字符指针至回车符的长度
+int getLineSize(const wchar_t* srcWstr);
 
 }
 

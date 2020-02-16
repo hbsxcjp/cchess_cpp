@@ -95,23 +95,16 @@ public:
 
     static PieceKind getKind(wchar_t ch)
     {
-        switch (toupper(ch)) {
-        case L'K':
-            return PieceKind::KING;
-        case L'A':
-            return PieceKind::ADVISOR;
-        case L'B':
-            return PieceKind::BISHOP;
-        case L'N':
-            return PieceKind::KNIGHT;
-        case L'R':
-            return PieceKind::ROOK;
-        case L'C':
-            return PieceKind::CANNON;
-        default: // L'P'
-            break;
-        }
-        return PieceKind::PAWN;
+        static map<wchar_t, PieceKind> chKinds = {
+            { L'K', PieceKind::KING },
+            { L'A', PieceKind::ADVISOR },
+            { L'B', PieceKind::BISHOP },
+            { L'N', PieceKind::KNIGHT },
+            { L'R', PieceKind::ROOK },
+            { L'C', PieceKind::CANNON },
+            { L'P', PieceKind::PAWN }
+        };
+        return chKinds[toupper(ch)];
     }
 
     static bool isKing(wchar_t name) { return nameChars_.substr(0, 2).find(name) != wstring::npos; }

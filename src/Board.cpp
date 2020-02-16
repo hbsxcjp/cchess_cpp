@@ -1,4 +1,4 @@
-﻿#include "Board.h"
+#include "Board.h"
 #include "Piece.h"
 #include "Seat.h"
 
@@ -79,30 +79,60 @@ const wstring Board::getPieceChars() const
 }
 
 const wstring Board::toString() const
-{ // 文本空棋盘
-    wstring textBlankBoard{ L"┏━┯━┯━┯━┯━┯━┯━┯━┓\n"
-                            "┃　│　│　│╲│╱│　│　│　┃\n"
-                            "┠─┼─┼─┼─╳─┼─┼─┼─┨\n"
-                            "┃　│　│　│╱│╲│　│　│　┃\n"
-                            "┠─╬─┼─┼─┼─┼─┼─╬─┨\n"
-                            "┃　│　│　│　│　│　│　│　┃\n"
-                            "┠─┼─╬─┼─╬─┼─╬─┼─┨\n"
-                            "┃　│　│　│　│　│　│　│　┃\n"
-                            "┠─┴─┴─┴─┴─┴─┴─┴─┨\n"
-                            "┃　　　　　　　　　　　　　　　┃\n"
-                            "┠─┬─┬─┬─┬─┬─┬─┬─┨\n"
-                            "┃　│　│　│　│　│　│　│　┃\n"
-                            "┠─┼─╬─┼─╬─┼─╬─┼─┨\n"
-                            "┃　│　│　│　│　│　│　│　┃\n"
-                            "┠─╬─┼─┼─┼─┼─┼─╬─┨\n"
-                            "┃　│　│　│╲│╱│　│　│　┃\n"
-                            "┠─┼─┼─┼─╳─┼─┼─┼─┨\n"
-                            "┃　│　│　│╱│╲│　│　│　┃\n"
-                            "┗━┷━┷━┷━┷━┷━┷━┷━┛\n" }; // 边框粗线
+{
+    map<PieceColor, const wchar_t*> PRESTR = {
+        { PieceColor::RED, L"　　　　　　　黑　方　　　　　　　\n１　２　３　４　５　６　７　８　９\n" },
+        { PieceColor::BLACK, L"　　　　　　　红　方　　　　　　　\n一　二　三　四　五　六　七　八　九\n" }
+    };
+    map<PieceColor, const wchar_t*> SUFSTR = {
+        { PieceColor::RED, L"九　八　七　六　五　四　三　二　一\n　　　　　　　红　方　　　　　　　\n" },
+        { PieceColor::BLACK, L"９　８　７　６　５　４　３　２　１\n　　　　　　　黑　方　　　　　　　\n" }
+    };
+    //*
+    wchar_t boardStr_t[] = L"┏━┯━┯━┯━┯━┯━┯━┯━┓\n"
+                           "┃　│　│　│╲│╱│　│　│　┃\n"
+                           "┠─┼─┼─┼─╳─┼─┼─┼─┨\n"
+                           "┃　│　│　│╱│╲│　│　│　┃\n"
+                           "┠─╬─┼─┼─┼─┼─┼─╬─┨\n"
+                           "┃　│　│　│　│　│　│　│　┃\n"
+                           "┠─┼─╬─┼─╬─┼─╬─┼─┨\n"
+                           "┃　│　│　│　│　│　│　│　┃\n"
+                           "┠─┴─┴─┴─┴─┴─┴─┴─┨\n"
+                           "┃　　　　　　　　　　　　　　　┃\n"
+                           "┠─┬─┬─┬─┬─┬─┬─┬─┨\n"
+                           "┃　│　│　│　│　│　│　│　┃\n"
+                           "┠─┼─╬─┼─╬─┼─╬─┼─┨\n"
+                           "┃　│　│　│　│　│　│　│　┃\n"
+                           "┠─╬─┼─┼─┼─┼─┼─╬─┨\n"
+                           "┃　│　│　│╲│╱│　│　│　┃\n"
+                           "┠─┼─┼─┼─╳─┼─┼─┼─┨\n"
+                           "┃　│　│　│╱│╲│　│　│　┃\n"
+                           "┗━┷━┷━┷━┷━┷━┷━┷━┛\n"; // 边框粗线，输出文本文件使用
+    //*/
+    /*/
+    wchar_t boardStr_t[] = L"　　＋－－－－－－－－－－－－－－－＋\n"
+                           "　　︱　︱　︱　︱＼︱／︱　︱　︱　︱\n"
+                           "　　︱－＋－＋－＋－＋－＋－＋－＋－︱\n"
+                           "　　︱　︱　︱　︱／︱＼︱　︱　︱　︱\n"
+                           "　　︱－＋－＋－＋－＋－＋－＋－＋－︱\n"
+                           "　　︱　︱　︱　︱　︱　︱　︱　︱　︱\n"
+                           "　　︱－＋－＋－＋－＋－＋－＋－＋－︱\n"
+                           "　　︱　︱　︱　︱　︱　︱　︱　︱　︱\n"
+                           "　　︱－－－－－－－－－－－－－－－︱\n"
+                           "　　︱　　　　　　　　　　　　　　　︱\n"
+                           "　　︱－－－－－－－－－－－－－－－︱\n"
+                           "　　︱　︱　︱　︱　︱　︱　︱　︱　︱\n"
+                           "　　︱－＋－＋－＋－＋－＋－＋－＋－︱\n"
+                           "　　︱　︱　︱　︱　︱　︱　︱　︱　︱\n"
+                           "　　︱－＋－＋－＋－＋－＋－＋－＋－︱\n"
+                           "　　︱　︱　︱　︱＼︱／︱　︱　︱　︱\n"
+                           "　　︱－＋－＋－＋－＋－＋－＋－＋－︱\n"
+                           "　　︱　︱　︱　︱／︱＼︱　︱　︱　︱\n"
+                           "　　＋－－－－－－－－－－－－－－－＋\n"; //全角字符，输出控制台屏幕使用
+    //*/
     wostringstream wos{};
-    /*// Pieces test
-    wos << L"pieces_:\n"
-        << pieces_->toString() << L"\n";
+    /*/ / Pieces test wos << L"pieces_:\n"
+                          << pieces_->toString() << L"\n";
     // RowCols test
     wos << L"seats_:\n"
         << seats_->toString() << L"\n";
@@ -113,10 +143,12 @@ const wstring Board::toString() const
     for (const auto& rowcol_p : SeatManager::getAllRowCols()) {
         auto ch = pieceChars[index++];
         if (ch != PieceManager::nullChar())
-            textBlankBoard[(BOARDROWNUM - 1 - rowcol_p.first) * 2 * (BOARDCOLNUM * 2) + rowcol_p.second * 2]
+            boardStr_t[(BOARDROWNUM - 1 - rowcol_p.first) * 2 * (BOARDCOLNUM * 2) + rowcol_p.second * 2]
                 = PieceManager::getPrintName(ch);
     }
-    wos << textBlankBoard;
+    wos << PRESTR[bottomColor_];
+    wos << boardStr_t;
+    wos << SUFSTR[bottomColor_];
     return wos.str();
 }
 /* ===== Board end. ===== */

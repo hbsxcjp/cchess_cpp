@@ -1,4 +1,4 @@
-# ²Î¿¼¡¶CÓïÑÔºËĞÄ¼¼Êõ¡·µÚ20ÕÂ
+# å‚è€ƒã€ŠCè¯­è¨€æ ¸å¿ƒæŠ€æœ¯ã€‹ç¬¬20ç« 
 #vpath %.h src
 #vpath %.cpp src
 #vpath %.o obj
@@ -9,7 +9,8 @@ CFLAGS = -Wall -std=c++11 -fexec-charset=gbk #-g
 SP = src/
 OP = obj/
 OBJS = $(OP)Tools.o $(OP)Piece.o $(OP)Seat.o $(OP)Board.o $(OP)ChessManual.o $(OP)Console.o $(OP)main.o
-FIXEDOBJ = $(OP)jsoncpp.o # ¹Ì¶¨µÄÄ¿±êÎÄ¼ş£¬Ò»°ãÖ»±àÒëÒ»´Î
+#OBJS = $(OP)Console.o $(OP)main.o
+FIXEDOBJ = $(OP)jsoncpp.o # å›ºå®šçš„ç›®æ ‡æ–‡ä»¶ï¼Œä¸€èˆ¬åªç¼–è¯‘ä¸€æ¬¡
 
 a.exe: $(OBJS) $(FIXEDOBJ)
 	$(CC) -Wall -o $@ $^ $(LDFLAGS) 
@@ -23,7 +24,7 @@ $(FIXEDOBJ): $(OP)%.o : $(SP)%.cpp
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 
-#ÒÔÏÂÒÀÀµÌõ¼şÌæ»»ÎªËùÓĞ.cÎÄ¼ş£¬Í¨¹ı-MÔ¤´¦Àí·¢ÏÖËùÓĞ.hÎÄ¼şµÄ±ä¶¯
+#ä»¥ä¸‹ä¾èµ–æ¡ä»¶æ›¿æ¢ä¸ºæ‰€æœ‰.cæ–‡ä»¶ï¼Œé€šè¿‡-Mé¢„å¤„ç†å‘ç°æ‰€æœ‰.hæ–‡ä»¶çš„å˜åŠ¨
 #dependencies: $(OBJS:.o=.cpp)
 #dependencies: $(SP)*.cpp
 #	$(CC) -M $^ > $@

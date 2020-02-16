@@ -1,4 +1,4 @@
-﻿#include "ChessManual.h"
+#include "ChessManual.h"
 #include "Board.h"
 #include "Piece.h"
 #include "Seat.h"
@@ -307,6 +307,19 @@ void ChessManual::write(const string& outfilename)
     default:
         break;
     }
+}
+
+bool ChessManual::isBottomSide(PieceColor color) const { return board_->isBottomSide(color); }
+
+const wstring ChessManual::getPieceChars() const { return board_->getPieceChars(); }
+
+const wstring ChessManual::getBoardStr() const { return board_->toString(); }
+
+const wstring ChessManual::getMoveStr() const
+{
+    wostringstream wos{};
+    __writeMove_PGN_CC(wos);
+    return wos.str();
 }
 
 const wstring ChessManual::toString()
