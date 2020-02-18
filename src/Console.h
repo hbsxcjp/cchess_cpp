@@ -48,17 +48,18 @@ class Console {
 public:
     Console();
 
-    void doView(const string& fileName = string{});
+    void open(const string& fileName = string{});
 
     ~Console();
 
 private:
-    HANDLE hIn_, hOut_;
     PDWORD pwritten;
     Menu* rootMenu_;
+    HANDLE hIn_, hOut_;
+    shared_ptr<ChessManual> cm_;
 
-    void __writeBoard(const ChessManual& cm);
-    void __writeMove(const wstring& moveStr);
+    void    __writeBoard();
+    void __writeMove();
 
     void __initArea();
     void __initMenu();

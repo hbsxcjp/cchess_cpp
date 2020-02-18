@@ -67,13 +67,13 @@ private:
 
 public:
     ChessManual(const string& infilename = string{});
+    void reset(); // 重置为常规的下棋初始状态，不需手工布子
 
     SMove& addNextMove(SMove& move, const PRowCol_pair& prowcol_pair, const wstring& remark) const;
     SMove& addOtherMove(SMove& move, const PRowCol_pair& prowcol_pair, const wstring& remark) const;
     SMove& addNextMove(SMove& move, const wstring& str, RecFormat fmt, const wstring& remark) const;
     SMove& addOtherMove(SMove& move, const wstring& str, RecFormat fmt, const wstring& remark) const;
 
-    void reset(); // 重置为常规的下棋初始状态，不需手工布子
     void read(const string& infilename);
     void write(const string& outfilename);
 

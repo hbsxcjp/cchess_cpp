@@ -16,7 +16,7 @@ static constexpr COORD WINCOORD = { WINCOLS, WINROWS };
 static constexpr SMALL_RECT WinRect = { 0, 0, SHORT(WINCOLS - 1), SHORT(WINROWS - 1) };
 static constexpr SMALL_RECT MenuRect = { WinRect.Left, WinRect.Top, WinRect.Right, 0 };
 static constexpr SMALL_RECT StatusRect = { WinRect.Left, SHORT(WinRect.Bottom - STATUSROWS + 1), WinRect.Right, WinRect.Bottom };
-static constexpr SMALL_RECT BoardRect = { WinRect.Left, SHORT(MenuRect.Bottom + 1), SHORT(WinRect.Left + BOARDCOLS), SHORT(MenuRect.Bottom + BOARDROWS) };
+static constexpr SMALL_RECT BoardRect = { WinRect.Left, SHORT(MenuRect.Bottom + 1), SHORT(WinRect.Left + BOARDCOLS - 1), SHORT(MenuRect.Bottom + BOARDROWS) };
 static constexpr SMALL_RECT CurmoveRect = { BoardRect.Left, SHORT(BoardRect.Bottom + 1), BoardRect.Right, SHORT(StatusRect.Top - 1) };
 static constexpr SMALL_RECT MoveRect = { SHORT(BoardRect.Right + 1), BoardRect.Top, WinRect.Right, CurmoveRect.Bottom };
 
@@ -61,13 +61,16 @@ static SMALL_RECT iMoveRect = { SHORT(moveWidth), SHORT(moveHeight) };
 //*/
 
 Console::Console()
-    : hIn_{ GetStdHandle(STD_INPUT_HANDLE) }
+    : pwritten{ nullptr }
+    , rootMenu_{ nullptr }
+    , hIn_{ GetStdHandle(STD_INPUT_HANDLE) }
     , hOut_{ CreateConsoleScreenBuffer(
           GENERIC_READ | GENERIC_WRITE, // read/write access
           FILE_SHARE_READ | FILE_SHARE_WRITE, // shared
           nullptr, // default security attributes
           CONSOLE_TEXTMODE_BUFFER, // must be TEXTMODE
-          NULL) }
+          NULL) } //*/
+    , cm_{ make_shared<ChessManual>() }
 {
     SetConsoleCP(936);
     SetConsoleOutputCP(936);
@@ -81,17 +84,19 @@ Console::Console()
     SetConsoleWindowInfo(hOut_, true, &WinRect);
     SetConsoleActiveScreenBuffer(hOut_);
 
+    //FillConsoleOutputAttribute(hOut_, MOVEATTR, WINROWS*WINCOLS, HOMEPOS, pwritten);
     __initArea();
     __initMenu();
 
+    //_getch();
     //GetConsoleScreenBufferInfo(hOut_, &bInfo); // 获取窗口信息
 }
 
-void Console::doView(const string& fileName)
+void Console::open(const string& fileName)
 {
-    ChessManual cm = ChessManual(fileName);
-    __writeBoard(cm);
-    __writeMove(cm.getMoveStr());
+    cm_ = make_shared<ChessManual>(fileName);
+    __writeBoard();
+    __writeMove();
 
     _getch();
 }
@@ -102,15 +107,15 @@ Console::~Console()
     __delMenu(rootMenu_);
 }
 
-void Console::__writeBoard(const ChessManual& cm)
+void Console::__writeBoard()
 {
-    bool bottomIsRed{ cm.isBottomSide(PieceColor::RED) };
+    bool bottomIsRed{ cm_->isBottomSide(PieceColor::RED) };
     int rows = BOARDROWS - 2, cols = BOARDCOLS - 6;
     SHORT left = BoardRect.Left + 3, top = BoardRect.Top + 1;
     WORD bottomAttr{ bottomIsRed ? RedSideAttr : BlackSideAttr }, topAttr{ bottomIsRed ? BlackSideAttr : RedSideAttr };
     for (auto row : { 0, 1, rows - 2, rows - 1 })
         FillConsoleOutputAttribute(hOut_, (row > 1 ? bottomAttr : topAttr), cols, { left, SHORT(top + row) }, pwritten);
-    const wstring pieceChars{ cm.getPieceChars() };
+    const wstring pieceChars{ cm_->getPieceChars() };
     for (int i = 0; i < SEATNUM; ++i) {
         wchar_t ch = pieceChars[i];
         if (ch == PieceManager::nullChar())
@@ -119,7 +124,7 @@ void Console::__writeBoard(const ChessManual& cm)
             2, { SHORT(left + (i % BOARDCOLNUM) * 4), SHORT(top + rows - 3 - (i / BOARDCOLNUM) * 2) }, pwritten);
     }
     int index = 0;
-    getShowWstr(cm.getBoardStr().c_str());
+    getShowWstr(cm_->getBoardStr().c_str());
     for (int row = 0; row < rows; ++row) {
         COORD rowPos = { left, SHORT(top + row) };
         wchar_t* lineStr = &showWstr[index];
@@ -129,9 +134,9 @@ void Console::__writeBoard(const ChessManual& cm)
     }
 }
 
-void Console::__writeMove(const wstring& moveStr)
+void Console::__writeMove()
 {
-    getShowWstr(moveStr.c_str());
+    getShowWstr(cm_->getMoveStr().c_str());
     int index{ 0 }, rows{ MoveRect.Bottom - MoveRect.Top - 2 }, cols{ MoveRect.Right - MoveRect.Left - 2 };
     for (int row = 0; row < rows; ++row) {
         COORD rowPos = { SHORT(MoveRect.Left + (row % 2 == 1 ? 2 : 3)), SHORT(MoveRect.Top + 1 + row) };
@@ -209,9 +214,9 @@ void Console::__initMenu()
     // 绘制菜单区域
     brotherMenu = rootMenu_;
     int width = 1;
-    while ((brotherMenu = brotherMenu->brotherMenu) != nullptr) { // 赋值且判断是否为空
-        COORD pos = { SHORT(width), MenuRect.Top };
-        WriteConsoleOutputCharacterW(hOut_, brotherMenu->name.c_str(), brotherMenu->name.size(), pos, pwritten);
+    while ((brotherMenu = brotherMenu->brotherMenu)) { // 赋值且判断是否为空
+        WriteConsoleOutputCharacterW(hOut_, brotherMenu->name.c_str(), brotherMenu->name.size(),
+            { SHORT(width), MenuRect.Top }, pwritten);
         width += brotherMenu->name.size() + 4;
     }
 }
@@ -229,32 +234,40 @@ void Console::__delMenu(Menu* menu)
 void Console::__initArea()
 {
     auto __drawArea = [&](WORD attr, const SMALL_RECT& rc) {
-        static const wchar_t tabChar[] = L"─│┌┐└┘";
-        int width{ rc.Right - rc.Left + 1 }, chWidth{ width - 2 }, height{ rc.Bottom - rc.Top };
-        FillConsoleOutputAttribute(hOut_, attr, width, COORD{ rc.Left, rc.Top }, pwritten);
-        if (height > 0)
-            FillConsoleOutputAttribute(hOut_, attr, width, COORD{ rc.Left, rc.Bottom }, pwritten);
-        if (height <= 1)
-            return;
-        FillConsoleOutputCharacterW(hOut_, tabChar[0], chWidth, { SHORT(rc.Left + 1), rc.Top }, pwritten);
-        FillConsoleOutputCharacterW(hOut_, tabChar[0], chWidth, { SHORT(rc.Left + 1), rc.Bottom }, pwritten);
-        for (int row = rc.Top + 1; row < rc.Bottom; ++row) {
-            FillConsoleOutputAttribute(hOut_, attr, width, COORD{ rc.Left, SHORT(row) }, pwritten);
-            FillConsoleOutputCharacterW(hOut_, tabChar[1], 1, { rc.Left, SHORT(row) }, pwritten);
-            FillConsoleOutputCharacterW(hOut_, tabChar[1], 1, { SHORT(rc.Right - 1), SHORT(row) }, pwritten);
+        const wchar_t tabChar[] = L"─│┌┐└┘";
+        int width{ rc.Right - rc.Left + 1 };
+        for (auto row = rc.Top; row <= rc.Bottom; ++row) {
+            COORD pos = COORD{ rc.Left, row };
+            FillConsoleOutputAttribute(hOut_, attr, width, pos, pwritten);
+            FillConsoleOutputCharacterW(hOut_, L' ', width, pos, pwritten);
         }
-        FillConsoleOutputCharacterW(hOut_, tabChar[2], 1, { rc.Left, rc.Top }, pwritten);
-        FillConsoleOutputCharacterW(hOut_, tabChar[3], 1, { SHORT(rc.Right - 1), rc.Top }, pwritten);
-        FillConsoleOutputCharacterW(hOut_, tabChar[4], 1, { rc.Left, rc.Bottom }, pwritten);
-        FillConsoleOutputCharacterW(hOut_, tabChar[5], 1, { SHORT(rc.Right - 1), rc.Bottom }, pwritten);
+        if (rc.Bottom < rc.Top + 2) // 少于2行则不画边框
+            return;
+        // 画边框
+        for (auto row : { rc.Top, rc.Bottom }) // 顶、底行
+            FillConsoleOutputCharacterW(hOut_, tabChar[0], width - 2, { SHORT(rc.Left + 1), row }, pwritten);
+        SHORT right = rc.Right - 1;
+        for (int row = rc.Top + 1; row < rc.Bottom; ++row)
+            for (auto col : { rc.Left, right })
+                FillConsoleOutputCharacterW(hOut_, tabChar[1], 1, { col, SHORT(row) }, pwritten);
+        const map<wchar_t, COORD> wchCoords = {
+            { tabChar[2], { rc.Left, rc.Top } },
+            { tabChar[3], { right, rc.Top } },
+            { tabChar[4], { rc.Left, rc.Bottom } },
+            { tabChar[5], { right, rc.Bottom } },
+        };
+        for (auto& wchCoord : wchCoords)
+            FillConsoleOutputCharacterW(hOut_, wchCoord.first, 1, wchCoord.second, pwritten);
     };
 
-    for (const auto& rectAttr : map<WORD, SMALL_RECT>{
-             { MENUATTR, MenuRect },
-             { BOARDATTR, BoardRect },
-             { CURMOVEATTR, CurmoveRect },
-             { MOVEATTR, MoveRect },
-             { STATUSATTR, StatusRect } })
+    const map<WORD, SMALL_RECT> rectAttrs = {
+        { MENUATTR, MenuRect },
+        { BOARDATTR, BoardRect },
+        { CURMOVEATTR, CurmoveRect },
+        { MOVEATTR, MoveRect },
+        { STATUSATTR, StatusRect }
+    };
+    for (const auto& rectAttr : rectAttrs)
         __drawArea(rectAttr.first, rectAttr.second);
 }
 

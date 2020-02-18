@@ -41,9 +41,10 @@ int main(int argc, char const* argv[])
     //*/
 
     using namespace ConsoleSpace;
-    Console console = Console();
-    console.doView("01.xqf");
-    //console.doView();
+    Console console{};
+    //console.open();
+    console.open("01.xqf");
+    //console.doView("01.xqf");
 
     auto time_d = steady_clock::now() - time0;
     wcout << L"use time: " << duration_cast<milliseconds>(time_d).count() / 1000.0 << L"s\n";

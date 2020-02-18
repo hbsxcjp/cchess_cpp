@@ -95,10 +95,17 @@ shared_ptr<ChessManual::Move>& ChessManual::Move::__addOther()
 ChessManual::ChessManual(const string& infilename)
     : info_{ map<wstring, wstring>{} }
     , board_{ make_shared<Board>() } // 动态分配内存，初始化对象并指向它
-    , rootMove_{ make_shared<Move>() }
-    , currentMove_{ make_shared<Move>() }
 {
+    reset();
     read(infilename);
+}
+
+void ChessManual::reset()
+{
+    __setFENplusFromFEN(PieceManager::FirstFEN(), PieceColor::RED);
+    __setBoardFromInfo();
+    currentMove_ = rootMove_ = make_shared<Move>();
+    movCount_ = remCount_ = remLenMax_ = maxRow_ = maxCol_ = 0;
 }
 
 shared_ptr<ChessManual::Move>& ChessManual::addNextMove(
@@ -123,14 +130,6 @@ shared_ptr<ChessManual::Move>& ChessManual::addOtherMove(
     SMove& move, const wstring& str, RecFormat fmt, const wstring& remark) const
 {
     return move->addOther(__getPRowCol_pair(str, fmt), remark);
-}
-
-void ChessManual::reset()
-{
-    __setFENplusFromFEN(PieceManager::FirstFEN(), PieceColor::RED);
-    __setBoardFromInfo();
-    currentMove_ = rootMove_ = make_shared<Move>();
-    movCount_ = remCount_ = remLenMax_ = maxRow_ = maxCol_ = 0;
 }
 
 void ChessManual::done(const SMove& move)
@@ -216,25 +215,19 @@ void ChessManual::changeSide(ChangeType ct)
 
 void ChessManual::read(const string& infilename)
 {
+    if (infilename.empty())
+        return;
     ifstream is;
     wifstream wis;
     RecFormat fmt{ RecFormat::XQF };
-    auto __isValid = [&]() {
-        if (infilename.empty())
-            return false;
-        fmt = getRecFormat(Tools::getExtStr(infilename));
-        if (fmt == RecFormat::XQF || fmt == RecFormat::BIN || fmt == RecFormat::JSON)
-            is.open(infilename, ios_base::binary);
-        else
-            wis.open(infilename);
-        if (is.fail() || wis.fail())
-            return false;
-        return true;
-    };
-    if (!__isValid()) {
-        reset(); // 默认初始化
+    fmt = getRecFormat(Tools::getExtStr(infilename));
+    if (fmt == RecFormat::XQF || fmt == RecFormat::BIN || fmt == RecFormat::JSON)
+        is.open(infilename, ios_base::binary);
+    else
+        wis.open(infilename);
+    if (is.fail() || wis.fail())
         return;
-    }
+
     switch (fmt) {
     case RecFormat::XQF:
         __readXQF(is);
@@ -266,23 +259,19 @@ void ChessManual::read(const string& infilename)
 
 void ChessManual::write(const string& outfilename)
 {
+    if (outfilename.empty())
+        return;
     ofstream os{};
     wofstream wos{};
     RecFormat fmt{ RecFormat::PGN_CC };
-    auto __isValid = [&]() {
-        if (outfilename.empty())
-            return false;
-        fmt = getRecFormat(Tools::getExtStr(outfilename));
-        if (fmt == RecFormat::XQF || fmt == RecFormat::BIN || fmt == RecFormat::JSON)
-            os.open(outfilename, ios_base::binary);
-        else
-            wos.open(outfilename);
-        if (os.fail() || wos.fail())
-            return false;
-        return true;
-    };
-    if (!__isValid())
+    fmt = getRecFormat(Tools::getExtStr(outfilename));
+    if (fmt == RecFormat::XQF || fmt == RecFormat::BIN || fmt == RecFormat::JSON)
+        os.open(outfilename, ios_base::binary);
+    else
+        wos.open(outfilename);
+    if (os.fail() || wos.fail())
         return;
+
     switch (fmt) {
     case RecFormat::XQF:
         break;
@@ -327,7 +316,7 @@ const wstring ChessManual::toString()
     wostringstream wos{};
 
     // Board test
-    wos << board_->toString() << L'\n';
+    //wos << board_->toString() << L'\n';
 
     __writeInfo_PGN(wos);
     __writeMove_PGN_CC(wos);
@@ -1029,8 +1018,8 @@ const wstring testChessmanual()
 {
     wostringstream wos{};
     ChessManual cm{};
-    cm.read("01.xqf");
     //*
+    cm.read("01.xqf");
 
     cm.write("01.bin");
     cm.read("01.bin");
@@ -1050,6 +1039,8 @@ const wstring testChessmanual()
     cm.write("01.pgn_cc");
     cm.read("01.pgn_cc");
     //*/
+    wos << boolalpha << cm.isBottomSide(PieceColor::RED) << L'\n'
+        << cm.getPieceChars() << L'\n' << cm.getBoardStr().c_str();
     wos << cm.toString();
 
     return wos.str();
