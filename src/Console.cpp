@@ -33,7 +33,7 @@ static constexpr SMALL_RECT MoveRect = { SHORT(BoardRect.Right + 1), BoardRect.T
     7 = 白色       F = 亮白色
 //*/
 static constexpr WORD WINATTR = 0x1F, MENUATTR = 0x8F, STATUSATTR = 0x84;
-static constexpr WORD BOARDATTR = 0xF8, CURMOVEATTR = 0x75, MOVEATTR = 0x71;
+static constexpr WORD BOARDATTR = 0xF8, CURMOVEATTR = 0x65, MOVEATTR = 0x71;
 static constexpr WORD RedSideAttr = 0xFC, BlackSideAttr = 0xF0;
 static constexpr WORD RedAttr = 0xCF, BlackAttr = 0x0F, SelRedAttr = 0x8C, SelBlackAttr = 0x0F;
 
@@ -134,7 +134,8 @@ void Console::__writeMove(const wstring& moveStr)
     getShowWstr(moveStr.c_str());
     int index{ 0 }, rows{ MoveRect.Bottom - MoveRect.Top - 2 }, cols{ MoveRect.Right - MoveRect.Left - 2 };
     for (int row = 0; row < rows; ++row) {
-        COORD rowPos = { SHORT(MoveRect.Left + (row % 2 == 1 ? 2 : 3)), SHORT(MoveRect.Top + 1 + row) };
+        //COORD rowPos = { SHORT(MoveRect.Left + (row % 2 == 1 ? 2 : 3)), SHORT(MoveRect.Top + 1 + row) };
+        COORD rowPos = { SHORT(MoveRect.Left + 2), SHORT(MoveRect.Top + 1 + row) };
         wchar_t* lineStr = &showWstr[index];
         int size = getLineSize(lineStr);
         if (size > cols) // size为含有全角、半角的字符数，cols为半角字符数?
@@ -228,18 +229,28 @@ void Console::__delMenu(Menu* menu)
 
 void Console::__initArea()
 {
+    auto __cleanArea = [&](WORD attr, const SMALL_RECT& rc) {
+        int width{ rc.Right - rc.Left + 1 };
+        for (SHORT row = rc.Top; row <= rc.Bottom; ++row) {
+            COORD pos = { rc.Left, row };
+            FillConsoleOutputAttribute(hOut_, attr, width, pos, pwritten);
+            FillConsoleOutputCharacterW(hOut_, L' ', width, pos, pwritten);
+        }
+    };
     auto __drawArea = [&](WORD attr, const SMALL_RECT& rc) {
+        //__cleanArea(attr, rc);
         static const wchar_t tabChar[] = L"─│┌┐└┘";
-        int width{ rc.Right - rc.Left + 1 }, chWidth{ width - 2 }, height{ rc.Bottom - rc.Top };
-        FillConsoleOutputAttribute(hOut_, attr, width, COORD{ rc.Left, rc.Top }, pwritten);
-        if (height > 0)
-            FillConsoleOutputAttribute(hOut_, attr, width, COORD{ rc.Left, rc.Bottom }, pwritten);
+        int chWidth{ rc.Right - rc.Left - 2 }, height{ rc.Bottom - rc.Top };
+        //int width{ rc.Right - rc.Left + 1 }, chWidth{ width - 2 }, height{ rc.Bottom - rc.Top };
+        //FillConsoleOutputAttribute(hOut_, attr, width, COORD{ rc.Left, rc.Top }, pwritten);
+        //if (height > 0)
+        //    FillConsoleOutputAttribute(hOut_, attr, width, COORD{ rc.Left, rc.Bottom }, pwritten);
         if (height <= 1)
             return;
         FillConsoleOutputCharacterW(hOut_, tabChar[0], chWidth, { SHORT(rc.Left + 1), rc.Top }, pwritten);
         FillConsoleOutputCharacterW(hOut_, tabChar[0], chWidth, { SHORT(rc.Left + 1), rc.Bottom }, pwritten);
         for (int row = rc.Top + 1; row < rc.Bottom; ++row) {
-            FillConsoleOutputAttribute(hOut_, attr, width, COORD{ rc.Left, SHORT(row) }, pwritten);
+            //FillConsoleOutputAttribute(hOut_, attr, width, COORD{ rc.Left, SHORT(row) }, pwritten);
             FillConsoleOutputCharacterW(hOut_, tabChar[1], 1, { rc.Left, SHORT(row) }, pwritten);
             FillConsoleOutputCharacterW(hOut_, tabChar[1], 1, { SHORT(rc.Right - 1), SHORT(row) }, pwritten);
         }
@@ -254,8 +265,10 @@ void Console::__initArea()
              { BOARDATTR, BoardRect },
              { CURMOVEATTR, CurmoveRect },
              { MOVEATTR, MoveRect },
-             { STATUSATTR, StatusRect } })
+             { STATUSATTR, StatusRect } }) {
+        __cleanArea(rectAttr.first, rectAttr.second);
         __drawArea(rectAttr.first, rectAttr.second);
+    }
 }
 
 void writeCharBuf(CHAR_INFO* charBuf, COORD bufSize, COORD bufCoord, SMALL_RECT& writeRect)
