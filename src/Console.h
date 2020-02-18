@@ -53,18 +53,24 @@ public:
     ~Console();
 
 private:
-    PDWORD pwritten;
+    int attrIndex{ 1 };
     Menu* rootMenu_;
     HANDLE hIn_, hOut_;
     shared_ptr<ChessManual> cm_;
 
-    void    __writeBoard();
+    void __writeBoard();
     void __writeMove();
 
     void __initArea();
     void __initMenu();
     void __delMenu(Menu* menu);
 };
+
+// 清除内容
+void cleanArea(HANDLE hOut, WORD attr, const SMALL_RECT& rc);
+
+// 画矩形边框
+void drawRect(HANDLE hOut, WORD attr, const SMALL_RECT& rc);
 
 void writeCharBuf(CHAR_INFO* charBuf, COORD bufSize, COORD bufCoord, SMALL_RECT& writeRect);
 
@@ -75,7 +81,6 @@ wchar_t* getShowWstr(const wchar_t* srcWstr);
 
 // 取得字符指针至回车符的长度
 int getLineSize(const wchar_t* srcWstr);
-
 }
 
 #endif
