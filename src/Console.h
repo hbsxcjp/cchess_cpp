@@ -46,9 +46,9 @@ typedef struct MenuData_ {
 
 class Console {
 public:
-    Console();
+    Console(const string& fileName = string{});
 
-    void open(const string& fileName = string{});
+    void open(const string& fileName);
 
     ~Console();
 
@@ -58,32 +58,31 @@ private:
     HANDLE hIn_, hOut_;
     shared_ptr<ChessManual> cm_;
 
+    void __writeAreas();
     void __writeBoard();
-    void __writeMove();
 
-    void __initArea();
     void __initMenu();
-    void __writeSubMenu(Menu* menu);
-    void __delMenu(Menu* menu);
+    void __writeSubMenu(Menu* menu, int rightSpaceNum);
 };
 
-void writeAreaWstr(HANDLE hOut, const wstring& wstr, int firstCol, const SMALL_RECT& rc, int rowBorder);
+// 选定菜单定位至顶层菜单
+Menu* getTopMenu(Menu* menu);
+// 选定菜单定位至底层菜单
+Menu* getBottomMenu(Menu* menu, int row = 100);
+// 选定菜单定位至左边或右边相同或相近层菜单
+Menu* getSameRowMenu(Menu* menu, bool isRight);
+
+void writeAreaWstr(HANDLE hOut, const wstring& wstr, int firstCol, int firstRow, const SMALL_RECT& rc);
 // 清除内容
+void drawArea(HANDLE hOut, WORD attr, WORD shadowAttr, const SMALL_RECT& rc);
 void cleanArea(HANDLE hOut, WORD attr, const SMALL_RECT& rc);
-void fillAreaSpace(HANDLE hOut, WORD attr, const SMALL_RECT& rc);
-void fillAreaAttr(HANDLE hOut, WORD attr, const SMALL_RECT& rc);
-// 画矩形边框
-void drawRect(HANDLE hOut, WORD attr, const SMALL_RECT& rc);
 
 void writeCharBuf(CHAR_INFO* charBuf, COORD bufSize, COORD bufCoord, SMALL_RECT& writeRect);
-
 void setCharBuf(CHAR_INFO* charBuf, COORD charCoord, const wchar_t* wchars, WORD attr);
 
 // 使用公用变量，获取用于屏幕显示的字符串（经试验，只有在制表符字符后插入空格，才能显示正常）
-wchar_t* getShowWstr(const wchar_t* srcWstr);
-
-// 取得字符指针至回车符的长度
-int getLineSize(const wchar_t* srcWstr);
+// 全角字符占2个字符位置，制表符占1个字符位置
+wchar_t* getShowWstr(wchar_t* showWstr, const wchar_t* srcWstr);
 }
 
 #endif
