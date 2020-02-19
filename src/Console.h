@@ -63,12 +63,15 @@ private:
 
     void __initArea();
     void __initMenu();
+    void __writeSubMenu(Menu* menu);
     void __delMenu(Menu* menu);
 };
 
+void writeAreaWstr(HANDLE hOut, const wstring& wstr, int firstCol, const SMALL_RECT& rc, int rowBorder);
 // 清除内容
 void cleanArea(HANDLE hOut, WORD attr, const SMALL_RECT& rc);
-
+void fillAreaSpace(HANDLE hOut, WORD attr, const SMALL_RECT& rc);
+void fillAreaAttr(HANDLE hOut, WORD attr, const SMALL_RECT& rc);
 // 画矩形边框
 void drawRect(HANDLE hOut, WORD attr, const SMALL_RECT& rc);
 

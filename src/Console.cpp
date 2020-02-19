@@ -137,10 +137,10 @@ void Console::__writeBoard()
     // 全角字符占2个字符位置，制表符占1个字符位置
     getShowWstr(cm_->getBoardStr().c_str());
     for (int row = 0; row < rows; ++row) {
-        COORD rowPos = { left, SHORT(top + row) };
+        COORD linePos = { left, SHORT(top + row) };
         wchar_t* lineStr = &showWstr[index];
         int size = getLineSize(lineStr);
-        WriteConsoleOutputCharacterW(hOut_, lineStr, size, rowPos, &written);
+        WriteConsoleOutputCharacterW(hOut_, lineStr, size, linePos, &written);
         index += size + 1; // +1加上回车符所占长度
     }
 }
@@ -151,15 +151,15 @@ void Console::__writeMove()
     int index{ 0 }, wstrlen = wcslen(showWstr),
                     rows{ MoveRect.Bottom - MoveRect.Top - 2 }, cols{ MoveRect.Right - MoveRect.Left - 2 };
     for (int row = 0; row < rows; ++row) {
-        COORD rowPos = { SHORT(MoveRect.Left + (row % 2 == 1 ? 2 : 3)), SHORT(MoveRect.Top + 1 + row) };
-        //COORD rowPos = { SHORT(MoveRect.Left + 2), SHORT(MoveRect.Top + 1 + row) };
+        COORD linePos = { SHORT(MoveRect.Left + (row % 2 == 1 ? 2 : 3)), SHORT(MoveRect.Top + 1 + row) };
+        //COORD linePos = { SHORT(MoveRect.Left + 2), SHORT(MoveRect.Top + 1 + row) };
         if (index >= wstrlen)
             break;
         wchar_t* lineStr = &showWstr[index];
         int size = getLineSize(lineStr);
         if (size > cols) // size为含有全角、半角的字符数，cols为半角字符数?
             size = cols;
-        WriteConsoleOutputCharacterW(hOut_, lineStr, size, rowPos, &written);
+        WriteConsoleOutputCharacterW(hOut_, lineStr, size, linePos, &written);
         index += size + 1; // +1加上回车符所占长度
     }
 }
@@ -245,9 +245,99 @@ void Console::__initMenu()
     brotherMenu = rootMenu_;
     int width = 1;
     while ((brotherMenu = brotherMenu->brotherMenu)) { // 赋值且判断是否为空
-        WriteConsoleOutputCharacterW(hOut_, brotherMenu->name.c_str(), brotherMenu->name.size(),
+        int namelen = brotherMenu->name.size();
+        WriteConsoleOutputCharacterW(hOut_, brotherMenu->name.c_str(), namelen,
             { SHORT(width), MenuRect.Top }, &written);
-        width += brotherMenu->name.size() + 4;
+        width += namelen + 4;
+    }
+}
+
+// 选定菜单定位至顶层菜单
+static Menu* getTopMenu(Menu* menu)
+{
+    Menu* tmenu = menu;
+    while (tmenu->brotherIndex > 1 && tmenu->childIndex == menu->childIndex) // 菜单顶层的brotherIndex==1
+        tmenu = tmenu->preMenu;
+    return tmenu->childMenu;
+}
+
+// 选定菜单定位至底层菜单
+static Menu* getBottomMenu(Menu* menu, int row = WINROWS)
+{
+    Menu* bmenu = menu;
+    int index = 0;
+    while (index++ < row && bmenu->brotherMenu != nullptr)
+        bmenu = bmenu->brotherMenu;
+    return bmenu;
+}
+
+// 选定菜单定位至左边或右边相同或相近层菜单
+static Menu* getSameRowMenu(Menu* menu, bool isRight)
+{
+    if (isRight && menu->childMenu)
+        return menu->childMenu;
+    else if (menu->preMenu->childIndex < menu->childIndex)
+        return menu->preMenu;
+    Menu* tmenu = getTopMenu(menu);
+    if ((isRight && !tmenu->brotherMenu)
+        || (!isRight && tmenu->preMenu->brotherIndex == 0)) // 向右没有兄弟菜单 或 向左前项菜单为根菜单
+        return menu;
+    return getBottomMenu(isRight ? tmenu->brotherMenu : tmenu->preMenu,
+        menu->brotherIndex - tmenu->brotherIndex + 1);
+}
+
+void Console::__writeSubMenu(Menu* menu)
+{
+
+    function<SHORT(Menu*)> __getPosL = [](Menu* menu) {
+        SHORT posL = 1;
+        Menu* tmenu = getTopMenu(menu);
+        return posL;
+    };
+
+    function<int(Menu*)> __getMaxWidth = [](Menu* menu) {
+        int maxWidth = 0;
+        Menu* tempMenu = menu->childMenu;
+        while (tempMenu != nullptr) {
+            int namelen = tempMenu->name.size();
+            if (maxWidth < namelen)
+                maxWidth = namelen;
+            tempMenu = tempMenu->brotherMenu;
+        }
+        return maxWidth;
+    };
+
+    function<int(Menu*)> __getRows = [](Menu* menu) {
+        int rows = 0;
+        Menu* tempMenu = menu->childMenu;
+        while (tempMenu != nullptr) {
+            ++rows;
+            tempMenu = tempMenu->brotherMenu;
+        }
+        return rows;
+    };
+
+    if (menu == nullptr)
+        return;
+    int rows = __getRows(menu), maxWidth = 0;
+    SHORT posL = __getPosL(menu);
+    vector<COORD> posXY{};
+    vector<wstring> chars{};
+    Menu* tempMenu = menu->childMenu;
+    SHORT posT = MenuRect.Bottom + menu->childMenu->childIndex;
+    while (tempMenu != nullptr) {
+        int namelen = tempMenu->name.size();
+        if (maxWidth < namelen)
+            maxWidth = namelen;
+        //posXY.push_back({ posL, SHORT{ posT + rows++ } });
+        tempMenu = tempMenu->brotherMenu;
+    }
+    fillAreaAttr(hOut_, MENUATTR[attrIndex], SMALL_RECT{ posL, posT, maxWidth + 4, SHORT(posT + rows - 1) });
+    int index = 0;
+    tempMenu = menu->childMenu;
+    while (tempMenu != nullptr) {
+        WriteConsoleOutputCharacterW(hOut_, tempMenu->name.c_str(), maxWidth, posXY[index++], &written);
+        tempMenu = tempMenu->brotherMenu;
     }
 }
 
@@ -261,14 +351,46 @@ void Console::__delMenu(Menu* menu)
     delete menu;
 }
 
+void writeAreaWstr(HANDLE hOut, const wstring& wstr, int firstCol, const SMALL_RECT& rc, int rowBorder)
+{
+    wstringstream wss;
+    wss << wstr;
+    int width = rc.Right - rc.Left - rowBorder * 2;
+    for (int row = rc.Top; row <= rc.Bottom; ++row) {
+        COORD linePos;
+       // = { rc.Left + rowBorder, row };
+        wstring lineStr;
+       // = getline(wss); // 读取一行
+        if (lineStr.empty()) // 空行退出
+            break;
+        int size = lineStr.size();
+        if (size <= firstCol) // 小于起始列退出
+            break;
+        if (size > width)
+            size = width;
+        const wchar_t* lineChars = lineStr.c_str() + firstCol; // 定位于起始列字符指针
+        WriteConsoleOutputCharacterW(hOut, lineChars, size, linePos, &written);
+    }
+}
+
 void cleanArea(HANDLE hOut, WORD attr, const SMALL_RECT& rc)
 {
+    fillAreaAttr(hOut, attr, rc);
+    fillAreaSpace(hOut, attr, rc);
+}
+
+void fillAreaSpace(HANDLE hOut, WORD attr, const SMALL_RECT& rc)
+{
     int width{ rc.Right - rc.Left + 1 };
-    for (SHORT row = rc.Top; row <= rc.Bottom; ++row) {
-        COORD pos = { rc.Left, row };
-        FillConsoleOutputAttribute(hOut, attr, width, pos, &written);
-        FillConsoleOutputCharacterW(hOut, L' ', width, pos, &written);
-    }
+    for (SHORT row = rc.Top; row <= rc.Bottom; ++row)
+        FillConsoleOutputCharacterW(hOut, L' ', width, COORD{ rc.Left, row }, &written);
+}
+
+void fillAreaAttr(HANDLE hOut, WORD attr, const SMALL_RECT& rc)
+{
+    int width{ rc.Right - rc.Left + 1 };
+    for (SHORT row = rc.Top; row <= rc.Bottom; ++row)
+        FillConsoleOutputAttribute(hOut, attr, width, COORD{ rc.Left, row }, &written);
 }
 
 void drawRect(HANDLE hOut, WORD attr, const SMALL_RECT& rc)
