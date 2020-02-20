@@ -8,7 +8,8 @@ static DWORD written; // 公用变量
 static constexpr wchar_t PROGRAMNAME[] = L"中国象棋 ";
 
 static constexpr SHORT WINROWS = 45, WINCOLS = 128;
-static constexpr SHORT BOARDROWS = 10 + 9, BOARDCOLS = (9 + 8) * 2;
+static constexpr SHORT SHADOWCOLS = 2, SHADOWROWS = 1, BORDERCOLS = 2, BORDERROWS = 1;
+static constexpr SHORT BOARDROWS = 10 + 9, BOARDCOLS = (9 + 8) * 2, BOARDTITLEH = 2;
 static constexpr SHORT STATUSROWS = 2;
 static constexpr COORD HOMEPOS = { 0, 0 };
 
@@ -16,15 +17,20 @@ static constexpr SMALL_RECT WinRect = { 0, 0, SHORT(WINCOLS - 1), SHORT(WINROWS 
 static constexpr SMALL_RECT MenuRect = { WinRect.Left, WinRect.Top, WinRect.Right, 0 };
 static constexpr SMALL_RECT StatusRect = { WinRect.Left, SHORT(WinRect.Bottom - STATUSROWS + 1), WinRect.Right, WinRect.Bottom };
 
-static constexpr SMALL_RECT BoardRect = { WinRect.Left + 2, SHORT(MenuRect.Bottom + 2), // 阴影需要1行、2列
-    SHORT(WinRect.Left + BOARDCOLS + 2 * 2 + 2), SHORT(MenuRect.Bottom + BOARDROWS + 2 * 2 + 2) }; // 阴影需要1行、2列
-static constexpr SMALL_RECT iBoardRect = { SHORT(BoardRect.Left + 2), SHORT(BoardRect.Top + 1), SHORT(BoardRect.Right - 4), SHORT(BoardRect.Bottom - 1) }; // 填充字符区域
+static constexpr SMALL_RECT BoardRect = { WinRect.Left + SHADOWCOLS, SHORT(MenuRect.Bottom + 1 + SHADOWROWS),
+    SHORT(WinRect.Left + BOARDCOLS + BORDERCOLS * 2 + SHADOWCOLS * 2), SHORT(MenuRect.Bottom + BOARDROWS + (SHADOWROWS + BORDERROWS + BOARDTITLEH) * 2) };
+static constexpr SMALL_RECT iBoardRect = { SHORT(BoardRect.Left + BORDERCOLS), SHORT(BoardRect.Top + BORDERROWS),
+    SHORT(BoardRect.Right - BORDERCOLS - SHADOWCOLS), SHORT(BoardRect.Bottom - BORDERROWS - SHADOWROWS) };
 
-static constexpr SMALL_RECT CurmoveRect = { BoardRect.Left, SHORT(BoardRect.Bottom + 2), BoardRect.Right, SHORT(StatusRect.Top - 2) };
-static constexpr SMALL_RECT iCurmoveRect = { SHORT(CurmoveRect.Left + 2), SHORT(CurmoveRect.Top + 1), SHORT(CurmoveRect.Right - 4), SHORT(CurmoveRect.Bottom - 1) }; // 填充字符区域
+static constexpr SMALL_RECT CurmoveRect = { BoardRect.Left, SHORT(BoardRect.Bottom + SHADOWROWS + 1),
+    BoardRect.Right, SHORT(StatusRect.Top - 1 - SHADOWROWS) };
+static constexpr SMALL_RECT iCurmoveRect = { SHORT(CurmoveRect.Left + BORDERCOLS), SHORT(CurmoveRect.Top + BORDERROWS),
+    SHORT(CurmoveRect.Right - BORDERCOLS - SHADOWCOLS), SHORT(CurmoveRect.Bottom - BORDERROWS - SHADOWROWS) };
 
-static constexpr SMALL_RECT MoveRect = { SHORT(BoardRect.Right + 3), BoardRect.Top, SHORT(WinRect.Right - 2), CurmoveRect.Bottom }; // 阴影需要1行、2列
-static constexpr SMALL_RECT iMoveRect = { SHORT(MoveRect.Left + 2), SHORT(MoveRect.Top + 1), SHORT(MoveRect.Right - 4), SHORT(MoveRect.Bottom - 1) }; // 填充字符区域
+static constexpr SMALL_RECT MoveRect = { SHORT(BoardRect.Right + 1 + SHADOWCOLS), BoardRect.Top,
+    SHORT(WinRect.Right - SHADOWCOLS), CurmoveRect.Bottom };
+static constexpr SMALL_RECT iMoveRect = { SHORT(MoveRect.Left + BORDERCOLS), SHORT(MoveRect.Top + BORDERROWS),
+    SHORT(MoveRect.Right - BORDERCOLS - SHADOWCOLS), iCurmoveRect.Bottom }; // 填充字符区域
 
 /*
 颜色属性由两个十六进制数字指定 -- 第一个对应于背景，第二个对应于前景。每个数字可以为以下任何值:
@@ -40,9 +46,9 @@ static constexpr SMALL_RECT iMoveRect = { SHORT(MoveRect.Left + 2), SHORT(MoveRe
 static constexpr WORD WINATTR[] = { 0x07, 0x77 };
 static constexpr WORD MENUATTR[] = { 0x80, 0x4F };
 static constexpr WORD BOARDATTR[] = { 0xF8, 0xE2 };
-static constexpr WORD CURMOVEATTR[] = { 0x70, 0xB5 };
+static constexpr WORD CURMOVEATTR[] = { 0x70, 0xB4 };
 static constexpr WORD MOVEATTR[] = { 0x70, 0x35 };
-static constexpr WORD STATUSATTR[] = { 0xF0, 0x51 };
+static constexpr WORD STATUSATTR[] = { 0xF0, 0x5B };
 static constexpr WORD SHADOWATTR[] = { 0x08, 0x82 };
 
 static constexpr WORD RedSideAttr[] = { 0x0C | (BOARDATTR[0] & 0xF0), 0x0C | (BOARDATTR[1] & 0xF0) };
@@ -138,7 +144,9 @@ Console::~Console()
 void Console::__writeAreas()
 {
     __writeBoard();
-    writeAreaWstr(hOut_, cm_->getMoveStr(), 0, 0, iMoveRect);
+    __writeMove();
+    __writeCurmove();
+    __writeStatus();
 
     _getch();
 }
@@ -146,12 +154,13 @@ void Console::__writeAreas()
 void Console::__writeBoard()
 {
     bool bottomIsRed{ cm_->isBottomSide(PieceColor::RED) };
-    int rows = BoardRect.Bottom - BoardRect.Top + 1; // 减：上下边框、阴影
     WORD bottomAttr{ bottomIsRed ? RedSideAttr[attrIndex] : BlackSideAttr[attrIndex] },
         topAttr{ bottomIsRed ? BlackSideAttr[attrIndex] : RedSideAttr[attrIndex] };
     // 顶、底两行上颜色
-    for (auto row : { 0, 1, rows - 2, rows - 1 })
-        FillConsoleOutputAttribute(hOut_, (row > 1 ? bottomAttr : topAttr), BOARDCOLS, { iBoardRect.Left, SHORT(iBoardRect.Top + row) }, &written);
+    for (int row = 0; row < BOARDTITLEH; ++row) {
+        FillConsoleOutputAttribute(hOut_, topAttr, BOARDCOLS, { iBoardRect.Left, SHORT(iBoardRect.Top + row) }, &written);
+        FillConsoleOutputAttribute(hOut_, bottomAttr, BOARDCOLS, { iBoardRect.Left, SHORT(iBoardRect.Bottom - row) }, &written);
+    }
     // 棋子文字上颜色
     const wstring pieceChars{ cm_->getPieceChars() };
     for (int i = 0; i < SEATNUM; ++i) {
@@ -159,13 +168,32 @@ void Console::__writeBoard()
         if (ch == PieceManager::nullChar())
             continue;
         // 字符属性函数不识别全角字符，均按半角字符计数
-        FillConsoleOutputAttribute(hOut_, (PieceManager::getColor(ch) == PieceColor::RED ? RedAttr[attrIndex] : BlackAttr[attrIndex]),
-            2, { SHORT(iBoardRect.Left + (i % BOARDCOLNUM) * 4), SHORT(iBoardRect.Top + rows - 3 - (i / BOARDCOLNUM) * 2) }, &written);
+        FillConsoleOutputAttribute(hOut_, (PieceManager::getColor(ch) == PieceColor::RED ? RedAttr[attrIndex] : BlackAttr[attrIndex]), 2,
+            { SHORT(iBoardRect.Left + (i % BOARDCOLNUM) * 4), SHORT(iBoardRect.Bottom - BOARDTITLEH - (i / BOARDCOLNUM) * 2) }, &written);
     }
 
     static wchar_t showWstr[1024];
     getShowWstr(showWstr, cm_->getBoardStr().c_str());
     writeAreaWstr(hOut_, wstring(showWstr), 0, 0, iBoardRect);
+}
+
+void Console::__writeMove()
+{
+    writeAreaWstr(hOut_, cm_->getMoveStr(), 0, 0, iMoveRect);
+}
+
+void Console::__writeCurmove()
+{
+    wstring wstr = { L"颜色属性由两个十六进制\n数字指定 -- \n第一个对应于   背 景，第      二个对应于前 景。\n每个数字\n\n可以为以下任何值" };
+
+    writeAreaWstr(hOut_, wstr, 0, 0, iCurmoveRect);
+}
+
+void Console::__writeStatus()
+{
+    wstring wstr = { L"颜色属性由两个十六进制数字指定 -- \n第一个对应于背景，第二个对应于前景。\n每个数字可以为以下任何值" };
+
+    writeAreaWstr(hOut_, wstr, 0, 0, StatusRect);
 }
 
 void Console::__initMenu()
@@ -330,14 +358,15 @@ void writeAreaWstr(HANDLE hOut, const wstring& wstr, int firstCol, int firstRow,
     while (firstRow-- > 0)
         getline(wss, lineStr); // 去掉开始数行
 
-    int width = rc.Right - rc.Left;
+    int width = rc.Right - rc.Left + 1;
     for (SHORT row = rc.Top; row <= rc.Bottom; ++row) {
         if (!getline(wss, lineStr))
             break;
+        //int size = getWstrLength(lineStr);
         int size = lineStr.size();
         if (size <= firstCol) // 小于起始列退出
             break;
-        if (size < width)
+        if (size < width) //  宽字符串长度 与 屏幕窄字符串长度 比较？
             lineStr += wstring(width - size, L' ');
         else
             size = width;
@@ -348,27 +377,27 @@ void writeAreaWstr(HANDLE hOut, const wstring& wstr, int firstCol, int firstRow,
 
 void drawArea(HANDLE hOut, WORD attr, WORD shadowAttr, const SMALL_RECT& rc)
 {
-    SHORT shright = rc.Right - 2, right = shright - 1, bottom = rc.Bottom - 1;
-    cleanArea(hOut, attr, SMALL_RECT{ rc.Left, rc.Top, shright, bottom });
+    SMALL_RECT irc = { rc.Left, rc.Top, SHORT(rc.Right - SHADOWCOLS), SHORT(rc.Bottom - SHADOWROWS) };
+    cleanArea(hOut, attr, irc);
+    SHORT left = irc.Left + 1, right = irc.Right - 1;
     const wchar_t tabChar[] = L"─│┌┐└┘";
-    for (auto row : { rc.Top, bottom }) // 顶、底行
-        FillConsoleOutputCharacterW(hOut, tabChar[0], right - 2, { SHORT(rc.Left + 1), row }, &written);
-    for (SHORT row = rc.Top + 1; row < bottom; ++row)
-        for (SHORT col : { rc.Left, right })
+    for (auto row : { irc.Top, irc.Bottom }) // 顶、底行
+        FillConsoleOutputCharacterW(hOut, tabChar[0], irc.Right - irc.Left - 2, { left, row }, &written);
+    for (SHORT row = irc.Top + 1; row < irc.Bottom; ++row)
+        for (SHORT col : { irc.Left, right })
             FillConsoleOutputCharacterW(hOut, tabChar[1], 1, { col, row }, &written);
     map<wchar_t, COORD> wchCoords = {
-        { tabChar[2], { rc.Left, rc.Top } },
-        { tabChar[3], { right, rc.Top } },
-        { tabChar[4], { rc.Left, bottom } },
-        { tabChar[5], { right, bottom } },
+        { tabChar[2], { irc.Left, irc.Top } },
+        { tabChar[3], { right, irc.Top } },
+        { tabChar[4], { irc.Left, irc.Bottom } },
+        { tabChar[5], { right, irc.Bottom } },
     };
     for (const auto& wchCoord : wchCoords)
         FillConsoleOutputCharacterW(hOut, wchCoord.first, 1, wchCoord.second, &written);
     // 底、右阴影色
-    FillConsoleOutputAttribute(hOut, shadowAttr, shright - rc.Left, { SHORT(rc.Left + 1), rc.Bottom }, &written);
-    right = rc.Right - 1;
+    FillConsoleOutputAttribute(hOut, shadowAttr, rc.Right - rc.Left + 1 - BORDERCOLS, { SHORT(rc.Left + BORDERCOLS), rc.Bottom }, &written);
     for (SHORT row = rc.Top + 1; row <= rc.Bottom; ++row)
-        FillConsoleOutputAttribute(hOut, shadowAttr, 2, { right, row }, &written);
+        FillConsoleOutputAttribute(hOut, shadowAttr, 2, { SHORT(rc.Right - 1), row }, &written);
 }
 
 void cleanArea(HANDLE hOut, WORD attr, const SMALL_RECT& rc)
@@ -419,6 +448,16 @@ wchar_t* getShowWstr(wchar_t* showWstr, const wchar_t* srcWstr)
     showWstr[desIndex] = L'\x0';
     return showWstr;
 }
+
+int getWstrLength(const wstring& wstr)
+{
+    int len = wstr.size();
+    for (auto& ch : wstr)
+        if (HIBYTE((WORD)ch)) // 中文在全角和半角下，高8位非0
+            ++len;
+    return len;
+}
+
 /*
 void DrawBox(bool bSingle, SMALL_RECT rc); // 函数功能：画边框
 

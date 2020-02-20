@@ -60,7 +60,10 @@ private:
 
     void __writeAreas();
     void __writeBoard();
+    void __writeMove();
+    void __writeCurmove();
 
+    void __writeStatus();
     void __initMenu();
     void __writeSubMenu(Menu* menu, int rightSpaceNum);
 };
@@ -83,6 +86,8 @@ void setCharBuf(CHAR_INFO* charBuf, COORD charCoord, const wchar_t* wchars, WORD
 // 使用公用变量，获取用于屏幕显示的字符串（经试验，只有在制表符字符后插入空格，才能显示正常）
 // 全角字符占2个字符位置，制表符占1个字符位置
 wchar_t* getShowWstr(wchar_t* showWstr, const wchar_t* srcWstr);
+// 取得宽字符串所占的屏幕宽度
+int getWstrLength(const wstring& wstr);
 }
 
 #endif
