@@ -55,7 +55,7 @@ public:
 private:
     int attrIndex{ 1 };
     Menu* rootMenu_;
-    HANDLE hIn_, hOut_;
+    HANDLE hIn_, hOut_, hCurMove_;
     shared_ptr<ChessManual> cm_;
 
     void __writeAreas();

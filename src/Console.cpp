@@ -26,6 +26,10 @@ static constexpr SMALL_RECT CurmoveRect = { BoardRect.Left, SHORT(BoardRect.Bott
     BoardRect.Right, SHORT(StatusRect.Top - 1 - SHADOWROWS) };
 static constexpr SMALL_RECT iCurmoveRect = { SHORT(CurmoveRect.Left + BORDERCOLS), SHORT(CurmoveRect.Top + BORDERROWS),
     SHORT(CurmoveRect.Right - BORDERCOLS - SHADOWCOLS), SHORT(CurmoveRect.Bottom - BORDERROWS - SHADOWROWS) };
+static constexpr SHORT curmoveHeight = iCurmoveRect.Bottom - iCurmoveRect.Top + 1, curmoveWidth = iCurmoveRect.Right - iCurmoveRect.Left + 1;
+static COORD iCurmoveCOORD = { curmoveWidth, curmoveHeight };
+static constexpr SMALL_RECT iCurmoveRect_x = { 0, 0, SHORT(curmoveWidth - 1), SHORT(curmoveHeight - 1) };
+static CHAR_INFO curmoveCharBuf[curmoveHeight * curmoveWidth];
 
 static constexpr SMALL_RECT MoveRect = { SHORT(BoardRect.Right + 1 + SHADOWCOLS), BoardRect.Top,
     SHORT(WinRect.Right - SHADOWCOLS), CurmoveRect.Bottom };
@@ -72,10 +76,6 @@ static COORD statusBufSize = { statusWidth, statusHeight };
 static COORD statusBufCoord = { StatusRect.Left, StatusRect.Top };
 static SMALL_RECT iStatusRect = { StatusRect.Left, StatusRect.Top, StatusRect.Right, StatusRect.Bottom };
 
-static constexpr int curmoveHeight = CurmoveRect.Bottom - CurmoveRect.Top + 1, curmoveWidth = CurmoveRect.Right - CurmoveRect.Left + 1;
-static CHAR_INFO curmoveCharBuf[curmoveHeight * curmoveWidth];
-static SMALL_RECT iCurmoveRect = { SHORT(curmoveWidth), SHORT(curmoveHeight) };
-
 static constexpr int moveHeight = MoveRect.Bottom - MoveRect.Top + 1, moveWidth = MoveRect.Right - MoveRect.Left + 1;
 static CHAR_INFO moveCharBuf[moveHeight * moveWidth];
 static SMALL_RECT iMoveRect = { SHORT(moveWidth), SHORT(moveHeight) };
@@ -117,6 +117,19 @@ Console::Console(const string& fileName)
         drawArea(hOut_, rectAttr.first, SHADOWATTR[attrIndex], rectAttr.second);
 
     __initMenu();
+
+    // 注解区域--屏幕缓冲区
+    hCurMove_ = CreateConsoleScreenBuffer(
+        GENERIC_READ | GENERIC_WRITE, // read/write access
+        FILE_SHARE_READ | FILE_SHARE_WRITE, // shared
+        nullptr, // default security attributes
+        CONSOLE_TEXTMODE_BUFFER, // must be TEXTMODE
+        NULL);
+    SetConsoleScreenBufferSize(hCurMove_, iCurmoveCOORD);
+    SetConsoleWindowInfo(hCurMove_, true, &iCurmoveRect_x);
+    cleanArea(hCurMove_, CURMOVEATTR[attrIndex], iCurmoveRect_x);
+    //FillConsoleOutputAttribute(hCurMove_, CURMOVEATTR[attrIndex], iCurmoveCOORD.X * iCurmoveCOORD.Y, HOMEPOS, &written);
+
     __writeAreas();
 }
 
@@ -184,9 +197,15 @@ void Console::__writeMove()
 
 void Console::__writeCurmove()
 {
-    wstring wstr = { L"颜色属性由两个十六进制\n数字指定 -- \n第一个对应于   背 景，第      二个对应于前 景。\n每个数字\n\n可以为以下任何值" };
+    wstring wstr = { L"颜色属性由两个十六进制数字指定--第一个对应于   背 景，第      二个对应于前 景。\n每个数字\n可以\n为以\n下任何值" };
+    SMALL_RECT curmoveRect = iCurmoveRect, curmoveRect_x = iCurmoveRect_x;
+    //writeAreaWstr(hCurMove_, wstr, 0, 0, curmoveRect);
 
-    writeAreaWstr(hOut_, wstr, 0, 0, iCurmoveRect);
+    //SMALL_RECT curmoveRect_x = { 0, 0, curmoveRect.Right - curmoveRect.Left, curmoveRect.Bottom - curmoveRect.Top };
+    WriteConsoleOutputCharacterW(hCurMove_, wstr.c_str(), wstr.size(), HOMEPOS, &written);
+    ReadConsoleOutputW(hCurMove_, curmoveCharBuf, iCurmoveCOORD, HOMEPOS, &curmoveRect_x);
+
+    WriteConsoleOutputW(hOut_, curmoveCharBuf, iCurmoveCOORD, HOMEPOS, &curmoveRect);
 }
 
 void Console::__writeStatus()
@@ -358,18 +377,20 @@ void writeAreaWstr(HANDLE hOut, const wstring& wstr, int firstCol, int firstRow,
     while (firstRow-- > 0)
         getline(wss, lineStr); // 去掉开始数行
 
-    int width = rc.Right - rc.Left + 1;
+    //int width = rc.Right - rc.Left + 1;
     for (SHORT row = rc.Top; row <= rc.Bottom; ++row) {
         if (!getline(wss, lineStr))
             break;
         //int size = getWstrLength(lineStr);
         int size = lineStr.size();
-        if (size <= firstCol) // 小于起始列退出
-            break;
+        if (size <= firstCol) // 小于起始列
+            continue;
+        /*
         if (size < width) //  宽字符串长度 与 屏幕窄字符串长度 比较？
             lineStr += wstring(width - size, L' ');
         else
             size = width;
+        //*/
         const wchar_t* lineChars = lineStr.c_str() + firstCol; // 定位于起始列字符指针
         WriteConsoleOutputCharacterW(hOut, lineChars, size, COORD{ rc.Left, row }, &written);
     }
@@ -452,8 +473,8 @@ wchar_t* getShowWstr(wchar_t* showWstr, const wchar_t* srcWstr)
 int getWstrLength(const wstring& wstr)
 {
     int len = wstr.size();
-    for (auto& ch : wstr)
-        if (HIBYTE((WORD)ch)) // 中文在全角和半角下，高8位非0
+    for (auto& wch : wstr)
+        if (wch > 0x2573) // 非制表符 // 中文高8位非0:HIBYTE((WORD)wch)
             ++len;
     return len;
 }
