@@ -1,4 +1,4 @@
-#include "ChessManual.h"
+﻿#include "ChessManual.h"
 #include "Board.h"
 #include "Piece.h"
 #include "Seat.h"
@@ -899,6 +899,8 @@ void ChessManual::__writeMove_PGN_CC(wostream& wos) const
     wostringstream remWss{};
     wstring blankStr((getMaxCol() + 1) * 5, L'　');
     vector<wstring> lineStr((getMaxRow() + 1) * 2, blankStr);
+    for (int row = lineStr.size() - 1; row > 0; row -= 2)
+        lineStr[row][0] = L' '; // 为显示美观，原宽空格改为窄空格
     function<void(const SMove&)>
         __setMovePGN_CC = [&](const SMove& move) {
             int firstcol{ move->CC_ColNo() * 5 }, row{ move->nextNo() * 2 };

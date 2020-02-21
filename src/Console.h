@@ -53,7 +53,7 @@ public:
     ~Console();
 
 private:
-    int attrIndex{ 1 };
+    int attr_{ 1 };
     Menu* rootMenu_;
     HANDLE hIn_, hOut_, hCurMove_;
     shared_ptr<ChessManual> cm_;
