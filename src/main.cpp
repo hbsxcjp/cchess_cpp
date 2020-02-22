@@ -42,6 +42,7 @@ int main(int argc, char const* argv[])
 
     using namespace ConsoleSpace;
     //Console console{};
+    //Console console{ };
     Console console{ "01.xqf" };
 
     auto time_d = steady_clock::now() - time0;
