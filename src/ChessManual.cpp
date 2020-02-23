@@ -62,13 +62,33 @@ vector<shared_ptr<ChessManual::Move>> ChessManual::Move::getPrevMoves()
     return moves;
 }
 
-const wstring ChessManual::Move::toString() const
+const wstring ChessManual::Move::toString()
 {
     wostringstream wos{};
-    wos << setw(2) << frowcol() << L'_' << setw(2) << trowcol()
-        << L'-' << setw(4) << iccs() << L':' << setw(4) << zh()
-        << L'@' << (eatPie_ ? eatPie_->name() : L'-') << L' ' << L'{' << remark() << L'}'
+    wos << setfill(L'0');
+    auto __write = [&](const SMove& move) {
+        if (move)
+            wos << setw(2) << move->frowcol() << L"->" << setw(2) << move->trowcol()
+                << L' ' << setw(4) << move->iccs() << L' ' << setw(4) << move->zh()
+                << L'@' << (move->eatPie() ? move->eatPie()->name() : L'-');
+        wos << L"\n\n";
+    };
+
+    wos << L"前着：";
+    __write(prev());
+
+    wos << L"现在：";
+    __write(shared_from_this());
+
+    wos << L"下着：";
+    __write(next());
+
+    wos << L"变着：";
+    __write(other());
+
+    wos << L"注解：" << remark() << L'\n'
         << L" next:" << nextNo_ << L" other:" << otherNo_ << L" CC_Col:" << CC_ColNo_ << L'\n';
+        
     return wos.str();
 }
 
@@ -303,6 +323,8 @@ bool ChessManual::isBottomSide(PieceColor color) const { return board_->isBottom
 const wstring ChessManual::getPieceChars() const { return board_->getPieceChars(); }
 
 const wstring ChessManual::getBoardStr() const { return board_->toString(); }
+
+const wstring ChessManual::getCurmoveStr() const { return currentMove_->toString(); }
 
 const wstring ChessManual::getMoveStr() const
 {

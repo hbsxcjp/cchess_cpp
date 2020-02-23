@@ -40,7 +40,7 @@ private:
         void cutNext() { next_ = nullptr; }
         void cutOther() { other_ && (other_ = other_->other_); }
 
-        const wstring toString() const;
+        const wstring toString();
 
         int nextNo() const { return nextNo_; }
         int otherNo() const { return otherNo_; }
@@ -96,6 +96,7 @@ public:
     bool isBottomSide(PieceColor color) const;
     const wstring getPieceChars() const;
     const wstring getBoardStr() const;
+    const wstring getCurmoveStr() const;
     const wstring getMoveStr() const;
     const wstring toString();
 
