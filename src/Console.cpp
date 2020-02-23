@@ -48,7 +48,7 @@ static constexpr WORD MENUATTR[] = { 0x80, 0x4F };
 static constexpr WORD BOARDATTR[] = { 0xF8, 0xE2 };
 static constexpr WORD CURMOVEATTR[] = { 0x70, 0xB4 };
 static constexpr WORD MOVEATTR[] = { 0x70, 0x1F };
-static constexpr WORD STATUSATTR[] = { 0xF0, 0x5B };
+static constexpr WORD STATUSATTR[] = { 0xF0, 0x5F };
 static constexpr WORD SHADOWATTR[] = { 0x08, 0x82 };
 
 static constexpr WORD RedSideAttr[] = { 0x0C | (BOARDATTR[0] & 0xF0), 0x0C | (BOARDATTR[1] & 0xF0) };
@@ -60,7 +60,7 @@ static constexpr WORD SelRedAttr[] = { 0xFC, 0xC0 };
 static constexpr WORD SelBlackAttr[] = { 0xF0, 0xE0 };
 
 static const wchar_t* const TabChars[] = { L"─│┌┐└┘", L"═║╔╗╚╝" };
-static const FocusArea Areas[] = { MENUA, BOARDA, CURMOVEA, MOVEA, STATUSA };
+static const FocusArea Areas[] = { MOVEA, CURMOVEA, BOARDA, MENUA }; //, STATUSA
 
 Console::Console(const string& fileName)
     : hIn_{ GetStdHandle(STD_INPUT_HANDLE) }
@@ -99,6 +99,7 @@ Console::Console(const string& fileName)
     __initMenu();
 
     __writeAreas();
+    __operateWin();
 }
 
 Console::~Console()
@@ -120,31 +121,36 @@ void Console::__operateWin()
 {
     int oldArea;
     auto __keyEventProc = [&](const KEY_EVENT_RECORD& ker) {
+        if (ker.bKeyDown) {
+            if (ker.dwControlKeyState & LEFT_ALT_PRESSED
+                || ker.dwControlKeyState & RIGHT_ALT_PRESSED) {
+                oldArea = areaI_;
+                areaI_ = 3;
+            } else
+                return;
+        }
         WORD key = ker.wVirtualKeyCode;
         if (key == VK_TAB) {
             areaI_ += (ker.dwControlKeyState & SHIFT_PRESSED) ? -1 : 1;
             if (areaI_ < 0)
-                areaI_ = 4;
-            else if (areaI_ > 4)
+                areaI_ = 3;
+            else if (areaI_ > 3)
                 areaI_ = 0;
             return;
-        } else if (ker.dwControlKeyState & LEFT_ALT_PRESSED || ker.dwControlKeyState & RIGHT_ALT_PRESSED) {
-            oldArea = areaI_;
-            areaI_ = 0;
         }
         switch (Areas[areaI_]) { // 区分不同区域, 进行操作
-        case MENUA:
-            //if (__operateMenu(ker))
-            //  areaI_ = oldArea;
-            break;
-        case BOARDA:
-            __operateBoard(key);
-            break;
         case MOVEA:
             __operateMove(key);
             break;
         case CURMOVEA:
             __operateCurMove(key);
+            break;
+        case BOARDA:
+            __operateBoard(key);
+            break;
+        case MENUA:
+            if (__operateMenu(ker))
+                areaI_ = oldArea;
             break;
         default:
             break;
@@ -156,17 +162,14 @@ void Console::__operateWin()
     };
 
     INPUT_RECORD irInBuf[128];
-    KEY_EVENT_RECORD ker;
     while (true) {
         ReadConsoleInput(hIn_, irInBuf, 128, &rwNum);
         for (DWORD i = 0; i < rwNum; i++) {
             switch (irInBuf[i].EventType) {
             case KEY_EVENT: // keyboard input
-                ker = irInBuf[i].Event.KeyEvent;
-                if ((ker.dwControlKeyState & LEFT_ALT_PRESSED || ker.dwControlKeyState & RIGHT_ALT_PRESSED)
-                    && (ker.wVirtualKeyCode == VK_F4))
+                if (irInBuf[i].Event.KeyEvent.wVirtualKeyCode == VK_ESCAPE)
                     return;
-                __keyEventProc(ker);
+                __keyEventProc(irInBuf[i].Event.KeyEvent);
                 break;
             case MOUSE_EVENT: // mouse input
                 __mouseEventProc(irInBuf[i].Event.MouseEvent);
@@ -174,6 +177,7 @@ void Console::__operateWin()
             default:
                 break;
             }
+            __writeStatus();
         }
     }
 }
@@ -181,18 +185,30 @@ void Console::__operateWin()
 bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
 {
     bool selected{ false };
-    if (ker.dwControlKeyState & LEFT_ALT_PRESSED
-        || ker.dwControlKeyState & RIGHT_ALT_PRESSED) {
-        switch (ker.uChar.AsciiChar) {
-        case 's':
-            curMenu_ = rootMenu_->brotherMenu;
-            __writeSubMenu(curMenu_, 2);
-            break;
-
-        default:
-            break;
-        }
+    switch (ker.wVirtualKeyCode) {
+    case 'F':
+        curMenu_ = rootMenu_->brotherMenu;
+        break;
+    case 'B':
+        curMenu_ = rootMenu_->brotherMenu->brotherMenu;
+        break;
+    case 'S':
+        curMenu_ = rootMenu_->brotherMenu->brotherMenu->brotherMenu;
+        break;
+    case 'A':
+        curMenu_ = rootMenu_->brotherMenu->brotherMenu->brotherMenu->brotherMenu;
+        break;
+    case VK_DOWN:
+        if (curMenu_->brotherMenu)
+            curMenu_ = curMenu_->brotherMenu;
+        else
+            curMenu_ = getTopMenu(curMenu_);
+        break;
+    default:
+        break;
     }
+    //__writeSubMenu(curMenu_, 2);
+
     return selected;
 }
 
@@ -205,15 +221,14 @@ void Console::__operateCurMove(WORD key) {}
 void Console::__writeAreas()
 {
     __writeBoard();
-    __writeMove();
     __writeCurmove();
+    __writeMove();
     __writeStatus();
-
-    _getch();
 }
 
 void Console::__writeBoard()
 {
+    __writeAreaLineChars(BOARDATTR[thema_], cm_->getBoardStr().c_str(), iBoardRect);
     bool bottomIsRed{ cm_->isBottomSide(PieceColor::RED) };
     WORD bottomAttr{ bottomIsRed ? RedSideAttr[thema_] : BlackSideAttr[thema_] },
         topAttr{ bottomIsRed ? BlackSideAttr[thema_] : RedSideAttr[thema_] };
@@ -232,28 +247,42 @@ void Console::__writeBoard()
         FillConsoleOutputAttribute(hOut_, (PieceManager::getColor(ch) == PieceColor::RED ? RedAttr[thema_] : BlackAttr[thema_]), 2,
             { SHORT(iBoardRect.Left + (i % BOARDCOLNUM) * 4), SHORT(iBoardRect.Bottom - BOARDTITLEH - (i / BOARDCOLNUM) * 2) }, &rwNum);
     }
-
-    __writeAreaLineChars(cm_->getBoardStr().c_str(), iBoardRect, BOARDCOLS);
 }
 
 void Console::__writeMove()
 {
-    __writeAreaLineChars(cm_->getMoveStr().c_str(), iMoveRect, mFirstRow_, mFirstCol_);
+    __writeAreaLineChars(MOVEATTR[thema_], cm_->getMoveStr().c_str(), iMoveRect, mFirstRow_, mFirstCol_);
 }
 
 void Console::__writeCurmove()
 {
-    int width = iCurmoveRect.Right - iCurmoveRect.Left + 1;
+    __writeAreaLineChars(CURMOVEATTR[thema_], cm_->getCurmoveStr().c_str(), iCurmoveRect, cmFirstRow_, cmFirstCol_);
+    int cols = iCurmoveRect.Right - iCurmoveRect.Left + 1;
     for (int row : { 2, 8, 9 })
-        FillConsoleOutputAttribute(hOut_, CurmoveAttr[thema_], width, { iCurmoveRect.Left, SHORT(iCurmoveRect.Top + row) }, &rwNum);
-    __writeAreaLineChars(cm_->getCurmoveStr().c_str(), iCurmoveRect, cmFirstRow_, cmFirstCol_);
+        FillConsoleOutputAttribute(hOut_, CurmoveAttr[thema_], cols, { iCurmoveRect.Left, SHORT(iCurmoveRect.Top + row) }, &rwNum);
 }
 
 void Console::__writeStatus()
 {
-    static wchar_t lineChars[] = L"颜色属性由两个十六进制数字指定 -- 第一个对应于背景，第二个对应于前景。每个数字可以为以下任何值: 0 = 黑色 8 = 灰色 1 = 蓝色 9 = 淡蓝色 2 = 绿色 A = 淡绿色 3 = 浅绿色 B = 淡浅绿色 4 = 红色 C = 淡红色 5 = 紫色 D = 淡紫色 6 = 黄色 E = 淡黄色 7 = 白色 F = 亮白色 ";
-
-    __writeAreaLineChars(lineChars, StatusRect, WINCOLS);
+    wostringstream wos{};
+    switch (Areas[areaI_]) {
+    case MENUA:
+        wos << L"【菜单】" << curMenu_->name << L": " << curMenu_->desc << L"设置显示主题，主要是棋盘、棋子的颜色配置 (Alt+S)";
+        break;
+    case BOARDA:
+        wos << L"【棋盘】";
+        break;
+    case CURMOVEA:
+        wos << L"【详解】";
+        break;
+    case MOVEA:
+        wos << L"【着法】";
+        break;
+    default:
+        break;
+    }
+    auto wstr = wos.str();
+    __writeAreaLineChars(STATUSATTR[thema_], wstr.c_str(), StatusRect);
 }
 
 void Console::__writeSubMenu(Menu* menu, int rightSpaceNum)
@@ -300,33 +329,29 @@ void Console::__writeSubMenu(Menu* menu, int rightSpaceNum)
     SHORT posL = __getPosL(menu), posT = MenuRect.Bottom + menu->childMenu->childIndex,
           posR = posL + maxWidth + rightSpaceNum, posB = posT + getBottomMenu(cmenu)->brotherIndex - cmenu->brotherIndex;
     SMALL_RECT rect = { posL, posT, posR, posB };
-    __cleanArea(MENUATTR[thema_], rect);
-    __writeAreaLineChars(__getWstr(menu, maxWidth).c_str(), rect, maxWidth);
+    __writeAreaLineChars(MENUATTR[thema_], __getWstr(menu, maxWidth).c_str(), rect);
 }
 
-void Console::__writeAreaLineChars(const wchar_t* lineChars, const SMALL_RECT& rc, int cols,
-    int firstRow, int firstCol, bool cutLine)
+void Console::__writeAreaLineChars(WORD attr, const wchar_t* lineChars, const SMALL_RECT& rc, int firstRow, int firstCol, bool cutLine)
 {
+    int cols = rc.Right - rc.Left + 1;
     wchar_t wch;
     static wchar_t tempLineChar[CHARSSIZE];
     auto __getLine = [&]() {
         int srcIndex = 0, desIndex = 0, showIndex = 0;
-        while ((wch = lineChars[srcIndex++]) != L'\x0') {
+        while ((wch = lineChars[srcIndex++]) != L'\x0' && wch != L'\n') {
             tempLineChar[desIndex++] = wch;
-            if (wch == L'\n')
-                break;
-            // 已至行尾最后一个 或 行尾前一个且下一个为全角
-            if (cutLine && (showIndex == cols || (showIndex == cols - 1 && lineChars[srcIndex] > 2573))) {
-                if (lineChars[srcIndex] == L'\n')
-                    tempLineChar[desIndex++] = lineChars[srcIndex++];
-                break;
-            }
-
             ++showIndex;
             if (wch >= 2500) {
                 ++showIndex; // 显示位置加一
                 if (wch >= 0x2500 && wch <= 0x2573) // 制表字符后加一空格
                     tempLineChar[desIndex++] = L' ';
+            }
+            // 已至行尾最后一个 或 行尾前一个且下一个为全角
+            if (cutLine && (showIndex == cols || (showIndex == cols - 1 && (wch = lineChars[srcIndex]) > 2573))) {
+                if (wch == L'\n')
+                    srcIndex++;
+                break;
             }
         }
         lineChars += srcIndex;
@@ -334,20 +359,13 @@ void Console::__writeAreaLineChars(const wchar_t* lineChars, const SMALL_RECT& r
         return desIndex;
     };
 
-    for (int row = 0; row < firstRow; ++row) // 去掉开始数行
+    while (firstRow-- > 0) // 去掉开始数行
         __getLine();
-
-    for (SHORT row = rc.Top; row <= rc.Bottom; ++row) {
-        int lineSize = __getLine();
-        if (lineSize == 0)
-            break;
-        else if (lineSize == 1) // 只有一个换行符
-            continue;
-        if (tempLineChar[lineSize - 1] == L'\n')
-            tempLineChar[--lineSize] = L'\x0'; // 去掉换行符
-        if ((lineSize -= firstCol) > 0)
+    int lineSize;
+    __cleanArea(attr, rc);
+    for (SHORT row = rc.Top; row <= rc.Bottom; ++row)
+        if ((lineSize = __getLine() - firstCol) > 0)
             WriteConsoleOutputCharacterW(hOut_, tempLineChar, lineSize, COORD{ rc.Left, row }, &rwNum);
-    }
 }
 
 void Console::__initMenu()
@@ -451,10 +469,10 @@ void Console::__initArea(WORD attr, WORD shadowAttr, const SMALL_RECT& rc)
 
 void Console::__cleanArea(WORD attr, const SMALL_RECT& rc)
 {
-    int width{ rc.Right - rc.Left + 1 };
+    int cols{ rc.Right - rc.Left + 1 };
     for (SHORT row = rc.Top; row <= rc.Bottom; ++row) {
-        FillConsoleOutputAttribute(hOut_, attr, width, COORD{ rc.Left, row }, &rwNum);
-        FillConsoleOutputCharacterW(hOut_, L' ', width, COORD{ rc.Left, row }, &rwNum);
+        FillConsoleOutputAttribute(hOut_, attr, cols, COORD{ rc.Left, row }, &rwNum);
+        FillConsoleOutputCharacterW(hOut_, L' ', cols, COORD{ rc.Left, row }, &rwNum);
     }
 }
 

@@ -13,11 +13,11 @@ namespace ConsoleSpace {
 
 // 控制台焦点区域类型
 typedef enum {
-    MENUA,
-    BOARDA,
-    CURMOVEA,
     MOVEA,
-    STATUSA
+    CURMOVEA,
+    BOARDA,
+    MENUA,
+    //STATUSA
 } FocusArea;
 
 // 区域主题颜色配置类型
@@ -57,7 +57,7 @@ private:
     Menu *rootMenu_, *curMenu_;
     shared_ptr<ChessManual> cm_;
     Thema thema_{ SHOWY };
-    int areaI_{ 3 };
+    int areaI_{};
     int cmFirstRow_{}, cmFirstCol_{}, mFirstRow_{}, mFirstCol_{};
 
     void __operateWin();
@@ -72,8 +72,7 @@ private:
     void __writeCurmove();
     void __writeStatus();
     void __writeSubMenu(Menu* menu, int rightSpaceNum);
-    void __writeAreaLineChars(const wchar_t* lineChars, const SMALL_RECT& rc, int cols,
-        int firstRow = 0, int firstCol = 0, bool cutLine = false);
+    void __writeAreaLineChars(WORD attr, const wchar_t* lineChars, const SMALL_RECT& rc, int firstRow = 0, int firstCol = 0, bool cutLine = false);
 
     void __initMenu();
     void __initArea(WORD attr, WORD shadowAttr, const SMALL_RECT& rc);
