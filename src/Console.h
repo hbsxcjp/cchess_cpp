@@ -15,8 +15,8 @@ namespace ConsoleSpace {
 typedef enum {
     MENUA,
     BOARDA,
-    MOVEA,
     CURMOVEA,
+    MOVEA,
     STATUSA
 } FocusArea;
 
@@ -48,22 +48,20 @@ class Console {
 public:
     Console(const string& fileName = string{});
 
-    void open(const string& fileName);
-
     void setThema(Thema thema) { thema_ = thema; }
 
     ~Console();
 
 private:
     HANDLE hIn_, hOut_;
-    Menu* rootMenu_;
+    Menu *rootMenu_, *curMenu_;
     shared_ptr<ChessManual> cm_;
     Thema thema_{ SHOWY };
-    FocusArea focusA_{ MOVEA };
+    int areaI_{ 3 };
     int cmFirstRow_{}, cmFirstCol_{}, mFirstRow_{}, mFirstCol_{};
 
     void __operateWin();
-    void __operateMenu(WORD key);
+    bool __operateMenu(const KEY_EVENT_RECORD& ker);
     void __operateBoard(WORD key);
     void __operateMove(WORD key);
     void __operateCurMove(WORD key);

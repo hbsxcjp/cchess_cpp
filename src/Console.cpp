@@ -60,6 +60,7 @@ static constexpr WORD SelRedAttr[] = { 0xFC, 0xC0 };
 static constexpr WORD SelBlackAttr[] = { 0xF0, 0xE0 };
 
 static const wchar_t* const TabChars[] = { L"─│┌┐└┘", L"═║╔╗╚╝" };
+static const FocusArea Areas[] = { MENUA, BOARDA, CURMOVEA, MOVEA, STATUSA };
 
 Console::Console(const string& fileName)
     : hIn_{ GetStdHandle(STD_INPUT_HANDLE) }
@@ -69,10 +70,11 @@ Console::Console(const string& fileName)
           nullptr, // default security attributes
           CONSOLE_TEXTMODE_BUFFER, // must be TEXTMODE
           NULL) } //*/
+    , cm_{ make_shared<ChessManual>(fileName) }
 {
     SetConsoleCP(936);
     SetConsoleOutputCP(936);
-    SetConsoleMode(hIn_, ENABLE_PROCESSED_INPUT | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT);
+    SetConsoleMode(hIn_, ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT); //ENABLE_PROCESSED_INPUT |
     SetConsoleTitleW(PROGRAMNAME); // 设置窗口标题
 
     SetConsoleScreenBufferSize(hOut_, { WINCOLS, WINROWS });
@@ -95,12 +97,7 @@ Console::Console(const string& fileName)
     for (const auto& rectAttr : rectAttrs)
         __initArea(rectAttr.first, SHADOWATTR[thema_], rectAttr.second);
     __initMenu();
-    open(fileName);
-}
 
-void Console::open(const string& fileName)
-{
-    cm_ = make_shared<ChessManual>(fileName);
     __writeAreas();
 }
 
@@ -121,14 +118,24 @@ Console::~Console()
 
 void Console::__operateWin()
 {
-    FocusArea oldArea = focusA_;
-    auto __keyEventProc = [&](KEY_EVENT_RECORD ker) {
-        WORD key = ker.Event..wVirtualKeyCode;
-
-        switch (focusA_) { // 区分不同区域, 进行操作
+    int oldArea;
+    auto __keyEventProc = [&](const KEY_EVENT_RECORD& ker) {
+        WORD key = ker.wVirtualKeyCode;
+        if (key == VK_TAB) {
+            areaI_ += (ker.dwControlKeyState & SHIFT_PRESSED) ? -1 : 1;
+            if (areaI_ < 0)
+                areaI_ = 4;
+            else if (areaI_ > 4)
+                areaI_ = 0;
+            return;
+        } else if (ker.dwControlKeyState & LEFT_ALT_PRESSED || ker.dwControlKeyState & RIGHT_ALT_PRESSED) {
+            oldArea = areaI_;
+            areaI_ = 0;
+        }
+        switch (Areas[areaI_]) { // 区分不同区域, 进行操作
         case MENUA:
-            __operateMenu(key);
-            focusA_ = oldArea;
+            //if (__operateMenu(ker))
+            //  areaI_ = oldArea;
             break;
         case BOARDA:
             __operateBoard(key);
@@ -144,29 +151,50 @@ void Console::__operateWin()
         }
     };
 
-    auto __mouseEventProc = [&](KEY_EVENT_RECORD ker) {
+    auto __mouseEventProc = [&](const MOUSE_EVENT_RECORD& ker) {
 
     };
 
     INPUT_RECORD irInBuf[128];
+    KEY_EVENT_RECORD ker;
     while (true) {
-     ReadConsoleInput(                hIn_,                 irInBuf,                 128,                 &rwNum))     ;
-     for (int i = 0; i < rwNum; i++) {
-         switch (irInBuf[i].EventType) {
-         case KEY_EVENT: // keyboard input
-             __keyEventProc(irInBuf[i].Event.KeyEvent);
-             break;
-         case MOUSE_EVENT: // mouse input
-             __mouseEventProc(irInBuf[i].Event.MouseEvent);
-             break;
-         default:
-             break;
-         }
-     }
+        ReadConsoleInput(hIn_, irInBuf, 128, &rwNum);
+        for (DWORD i = 0; i < rwNum; i++) {
+            switch (irInBuf[i].EventType) {
+            case KEY_EVENT: // keyboard input
+                ker = irInBuf[i].Event.KeyEvent;
+                if ((ker.dwControlKeyState & LEFT_ALT_PRESSED || ker.dwControlKeyState & RIGHT_ALT_PRESSED)
+                    && (ker.wVirtualKeyCode == VK_F4))
+                    return;
+                __keyEventProc(ker);
+                break;
+            case MOUSE_EVENT: // mouse input
+                __mouseEventProc(irInBuf[i].Event.MouseEvent);
+                break;
+            default:
+                break;
+            }
+        }
     }
 }
 
-void Console::__operateMenu(WORD key) {}
+bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
+{
+    bool selected{ false };
+    if (ker.dwControlKeyState & LEFT_ALT_PRESSED
+        || ker.dwControlKeyState & RIGHT_ALT_PRESSED) {
+        switch (ker.uChar.AsciiChar) {
+        case 's':
+            curMenu_ = rootMenu_->brotherMenu;
+            __writeSubMenu(curMenu_, 2);
+            break;
+
+        default:
+            break;
+        }
+    }
+    return selected;
+}
 
 void Console::__operateBoard(WORD key) {}
 
@@ -393,6 +421,7 @@ void Console::__initMenu()
             { SHORT(width), MenuRect.Top }, &rwNum);
         width += namelen + 4;
     }
+    curMenu_ = rootMenu_;
 }
 
 void Console::__initArea(WORD attr, WORD shadowAttr, const SMALL_RECT& rc)
