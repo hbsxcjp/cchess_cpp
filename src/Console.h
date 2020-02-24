@@ -68,8 +68,8 @@ private:
 
     void __writeAreas();
     void __writeBoard();
-    void __writeMove();
     void __writeCurmove();
+    void __writeMove();
     void __writeStatus();
     void __writeSubMenu(Menu* menu, int rightSpaceNum);
     void __writeAreaLineChars(WORD attr, const wchar_t* lineChars, const SMALL_RECT& rc, int firstRow = 0, int firstCol = 0, bool cutLine = false);

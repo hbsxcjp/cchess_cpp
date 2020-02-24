@@ -249,11 +249,6 @@ void Console::__writeBoard()
     }
 }
 
-void Console::__writeMove()
-{
-    __writeAreaLineChars(MOVEATTR[thema_], cm_->getMoveStr().c_str(), iMoveRect, mFirstRow_, mFirstCol_);
-}
-
 void Console::__writeCurmove()
 {
     __writeAreaLineChars(CURMOVEATTR[thema_], cm_->getCurmoveStr().c_str(), iCurmoveRect, cmFirstRow_, cmFirstCol_);
@@ -262,12 +257,17 @@ void Console::__writeCurmove()
         FillConsoleOutputAttribute(hOut_, CurmoveAttr[thema_], cols, { iCurmoveRect.Left, SHORT(iCurmoveRect.Top + row) }, &rwNum);
 }
 
+void Console::__writeMove()
+{
+    __writeAreaLineChars(MOVEATTR[thema_], cm_->getMoveStr().c_str(), iMoveRect, mFirstRow_, mFirstCol_);
+}
+
 void Console::__writeStatus()
 {
     wostringstream wos{};
     switch (Areas[areaI_]) {
     case MENUA:
-        wos << L"【菜单】" << curMenu_->name << L": " << curMenu_->desc << L"设置显示主题，主要是棋盘、棋子的颜色配置 (Alt+S)";
+        wos << L"【菜单】" << curMenu_->name << L": " << curMenu_->desc;
         break;
     case BOARDA:
         wos << L"【棋盘】";
@@ -335,24 +335,26 @@ void Console::__writeSubMenu(Menu* menu, int rightSpaceNum)
 void Console::__writeAreaLineChars(WORD attr, const wchar_t* lineChars, const SMALL_RECT& rc, int firstRow, int firstCol, bool cutLine)
 {
     int cols = rc.Right - rc.Left + 1;
-    wchar_t wch;
     static wchar_t tempLineChar[CHARSSIZE];
     auto __getLine = [&]() {
-        int srcIndex = 0, desIndex = 0, showIndex = 0;
-        while ((wch = lineChars[srcIndex++]) != L'\x0' && wch != L'\n') {
-            tempLineChar[desIndex++] = wch;
-            ++showIndex;
-            if (wch >= 2500) {
-                ++showIndex; // 显示位置加一
-                if (wch >= 0x2500 && wch <= 0x2573) // 制表字符后加一空格
-                    tempLineChar[desIndex++] = L' ';
+        int srcIndex = 0, desIndex = 0, showCols = 0;
+        wchar_t wch = lineChars[0];
+        if (wch != L'\x0') {
+            while (wch != L'\x0' && wch != L'\n') {
+                tempLineChar[desIndex++] = wch;
+                ++showCols;
+                if (wch >= 0x2500) {
+                    ++showCols; // 显示位置加一
+                    if (wch <= 0x2573) // 制表字符后加一空格 wch >= 0x2500 &&
+                        tempLineChar[desIndex++] = L' ';
+                }
+                wch = lineChars[++srcIndex];
+                // 已至行尾最后一个 或 行尾前一个且下一个为全角
+                if (cutLine && (showCols == cols || (showCols == cols - 1 && wch > 0x2573)))
+                    break;
             }
-            // 已至行尾最后一个 或 行尾前一个且下一个为全角
-            if (cutLine && (showIndex == cols || (showIndex == cols - 1 && (wch = lineChars[srcIndex]) > 2573))) {
-                if (wch == L'\n')
-                    srcIndex++;
-                break;
-            }
+            if (wch == L'\n')
+                ++srcIndex;
         }
         lineChars += srcIndex;
         tempLineChar[desIndex] = L'\x0';
@@ -361,11 +363,11 @@ void Console::__writeAreaLineChars(WORD attr, const wchar_t* lineChars, const SM
 
     while (firstRow-- > 0) // 去掉开始数行
         __getLine();
-    int lineSize;
+    int showSize;
     __cleanArea(attr, rc);
     for (SHORT row = rc.Top; row <= rc.Bottom; ++row)
-        if ((lineSize = __getLine() - firstCol) > 0)
-            WriteConsoleOutputCharacterW(hOut_, tempLineChar, lineSize, COORD{ rc.Left, row }, &rwNum);
+        if ((showSize = __getLine() - firstCol) > 0)
+            WriteConsoleOutputCharacterW(hOut_, tempLineChar, showSize, COORD{ rc.Left, row }, &rwNum);
 }
 
 void Console::__initMenu()
