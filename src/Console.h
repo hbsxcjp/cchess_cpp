@@ -5,20 +5,16 @@
 #include <conio.h>
 #include <stdio.h>
 #include <windows.h>
-#define UNICODE
 
-#define KEY_ESC 0x1b /* Escape */
 
 namespace ConsoleSpace {
 
 // 控制台焦点区域类型
-typedef enum {
-    MOVEA,
-    CURMOVEA,
-    BOARDA,
-    MENUA,
-    //STATUSA
-} FocusArea;
+#define MOVEA 0
+#define CURMOVEA 1
+#define BOARDA 2
+#define MENUA 3
+#define STATUSA 4
 
 // 区域主题颜色配置类型
 typedef enum {
@@ -34,7 +30,7 @@ typedef void (*MENU_FUNC)(void);
 typedef struct Menu_ {
     wstring name, desc;
     MENU_FUNC func; // 菜单关联的命令函数，如有子菜单则应为空
-    struct Menu_ *preMenu, *brotherMenu, *childMenu;
+    struct Menu_ *preMenu{}, *brotherMenu{}, *childMenu{};
     int brotherIndex, childIndex;
 } Menu;
 
@@ -57,7 +53,7 @@ private:
     Menu *rootMenu_, *curMenu_;
     shared_ptr<ChessManual> cm_;
     Thema thema_{ SHOWY };
-    int areaI_{};
+    int area_{};
     int cmFirstRow_{}, cmFirstCol_{}, mFirstRow_{}, mFirstCol_{};
 
     void __operateWin();

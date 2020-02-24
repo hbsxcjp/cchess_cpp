@@ -61,7 +61,6 @@ static constexpr WORD SelRedAttr[] = { 0xFC, 0xC0 };
 static constexpr WORD SelBlackAttr[] = { 0xF0, 0xE0 };
 
 static const wchar_t* const TabChars[] = { L"─│┌┐└┘", L"═║╔╗╚╝" };
-static const FocusArea Areas[] = { MOVEA, CURMOVEA, BOARDA, MENUA }; //, STATUSA
 
 Console::Console(const string& fileName)
     : hIn_{ GetStdHandle(STD_INPUT_HANDLE) }
@@ -120,26 +119,28 @@ Console::~Console()
 
 void Console::__operateWin()
 {
-    int oldArea;
+    int oldArea{ area_ };
     auto __keyEventProc = [&](const KEY_EVENT_RECORD& ker) {
-        if (ker.bKeyDown) {
-            if (ker.dwControlKeyState & LEFT_ALT_PRESSED
-                || ker.dwControlKeyState & RIGHT_ALT_PRESSED) {
-                oldArea = areaI_;
-                areaI_ = 3;
-            } else
-                return;
-        }
+        if (ker.bKeyDown)
+            return;
         WORD key = ker.wVirtualKeyCode;
         if (key == VK_TAB) {
-            areaI_ += (ker.dwControlKeyState & SHIFT_PRESSED) ? -1 : 1;
-            if (areaI_ < 0)
-                areaI_ = 3;
-            else if (areaI_ > 3)
-                areaI_ = 0;
+            area_ = (area_ + ((ker.dwControlKeyState & SHIFT_PRESSED) ? -1 : 1) + 4) % 4;
             return;
         }
-        switch (Areas[areaI_]) { // 区分不同区域, 进行操作
+        if ((ker.dwControlKeyState & (LEFT_ALT_PRESSED | RIGHT_ALT_PRESSED))
+            && (key == 'F' || key == 'B' || key == 'S' || key == 'A')) {
+            if (area_ != MENUA) {
+                oldArea = area_;
+                area_ = MENUA;
+            } else
+                area_ = oldArea;
+            //if (__operateMenu(ker))
+            //    area_ = oldArea;
+            //return;
+        }
+        //assert(area_ >= 0 && area_ <= 3);
+        switch (area_) { // 区分不同区域, 进行操作
         case MOVEA:
             __operateMove(key);
             break;
@@ -151,7 +152,7 @@ void Console::__operateWin()
             break;
         case MENUA:
             if (__operateMenu(ker))
-                areaI_ = oldArea;
+                area_ = oldArea;
             break;
         default:
             break;
@@ -166,11 +167,12 @@ void Console::__operateWin()
     while (true) {
         ReadConsoleInput(hIn_, irInBuf, 128, &rwNum);
         for (DWORD i = 0; i < rwNum; i++) {
+            auto ker = irInBuf[i].Event.KeyEvent;
             switch (irInBuf[i].EventType) {
             case KEY_EVENT: // keyboard input
-                if (irInBuf[i].Event.KeyEvent.wVirtualKeyCode == VK_ESCAPE)
+                if (ker.wVirtualKeyCode == VK_ESCAPE)
                     return;
-                __keyEventProc(irInBuf[i].Event.KeyEvent);
+                __keyEventProc(ker);
                 break;
             case MOUSE_EVENT: // mouse input
                 __mouseEventProc(irInBuf[i].Event.MouseEvent);
@@ -178,32 +180,44 @@ void Console::__operateWin()
             default:
                 break;
             }
-            __writeStatus();
+            if (!ker.bKeyDown)
+                __writeStatus();
         }
     }
 }
 
 bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
 {
-    // 同层菜单顶层
-    auto __getTopMenu = [&](Menu* menu) {
-        while (menu->childIndex == menu->preMenu->childIndex)
-            menu = menu->preMenu;
-        return menu->childMenu;
-    };
-
-    // 同层菜单底部
-    auto __getBottomMenu = [&](Menu* menu) {
-        while (menu->brotherMenu != nullptr)
+    // 菜单顶层第i个
+    auto __getTopIndexMenu = [&](int index = 0) {
+        auto menu = rootMenu_->brotherMenu;
+        while (index-- > 0 && menu->brotherMenu)
             menu = menu->brotherMenu;
         return menu;
     };
 
-    // 同层菜单最大尺寸
+    // 菜单顶层
+    auto __getTopMenu = [&](Menu* menu) {
+        if (menu->childIndex == 0)
+            return menu;
+        int brotherIndex = menu->brotherIndex;
+        while (brotherIndex == menu->preMenu->brotherIndex)
+            menu = menu->preMenu;
+        return menu->childMenu;
+    };
+
+    // 菜单底部
+    auto __getBottomMenu = [&](Menu* menu) {
+        while (menu->childMenu != nullptr)
+            menu = menu->childMenu;
+        return menu;
+    };
+
+    // 菜单最大尺寸
     auto __getMaxSize = [&](Menu* menu) {
         menu = __getTopMenu(menu);
         int maxSize = menu->name.size();
-        while ((menu = menu->brotherMenu) != nullptr)
+        while ((menu = menu->childMenu) != nullptr)
             maxSize = max(maxSize, int(menu->name.size()));
         return maxSize;
     };
@@ -212,7 +226,7 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
     auto __getWstr = [&](Menu* menu) {
         menu = __getTopMenu(menu);
         wstring wstr{ menu->name + L'\n' };
-        while ((menu = menu->brotherMenu) != nullptr)
+        while ((menu = menu->childMenu) != nullptr)
             wstr += menu->name + L'\n';
         return wstr;
     };
@@ -220,24 +234,22 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
     bool selected{ false };
     switch (ker.wVirtualKeyCode) {
     case 'F':
-        curMenu_ = rootMenu_->brotherMenu;
+        curMenu_ = __getTopIndexMenu();
         break;
     case 'B':
-        curMenu_ = rootMenu_->brotherMenu->brotherMenu;
+        curMenu_ = __getTopIndexMenu(1);
         break;
     case 'S':
-        curMenu_ = rootMenu_->brotherMenu->brotherMenu->brotherMenu;
+        curMenu_ = __getTopIndexMenu(2);
         break;
     case 'A':
-        curMenu_ = rootMenu_->brotherMenu->brotherMenu->brotherMenu->brotherMenu;
+        curMenu_ = __getTopIndexMenu(3);
         break;
     case VK_DOWN:
         if (curMenu_ == rootMenu_)
-            curMenu_ = curMenu_->brotherMenu;
-        else if (curMenu_->childIndex == 0)
+            curMenu_ = __getTopIndexMenu()->childMenu;
+        else if (curMenu_->childMenu != nullptr)
             curMenu_ = curMenu_->childMenu;
-        else if (curMenu_->brotherMenu != nullptr)
-            curMenu_ = curMenu_->brotherMenu;
         else
             curMenu_ = __getTopMenu(curMenu_);
         break;
@@ -248,18 +260,61 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
             curMenu_ = __getBottomMenu(curMenu_);
         break;
     case VK_HOME:
+        curMenu_ = __getTopMenu(curMenu_);
         break;
     case VK_END:
+        curMenu_ = __getBottomMenu(curMenu_);
         break;
     case VK_LEFT:
+        if (curMenu_->childIndex == 0) { // 顶层菜单
+            if (curMenu_->preMenu != rootMenu_)
+                curMenu_ = curMenu_->preMenu;
+            else
+                curMenu_ = __getTopIndexMenu(3);
+        } else {
+            int rows{ curMenu_->childIndex };
+            auto tmenu = __getTopMenu(curMenu_);
+            while (tmenu->childIndex != 0) {
+                rows += tmenu->preMenu->childIndex;
+                tmenu = __getTopMenu(tmenu->preMenu); // 取得顶层菜单
+            }
+            if (tmenu->preMenu != rootMenu_) // 向左
+                tmenu = tmenu->preMenu->childMenu;
+            else
+                tmenu = __getTopIndexMenu(3)->childMenu;
+            while (--rows > 0 && tmenu->childMenu != nullptr)
+                tmenu = tmenu->childMenu;
+            curMenu_ = tmenu;
+        }
         break;
     case VK_RIGHT:
+        if (curMenu_->childIndex == 0) { // 顶层菜单
+            if (curMenu_->brotherMenu != nullptr)
+                curMenu_ = curMenu_->brotherMenu;
+            else
+                curMenu_ = __getTopIndexMenu();
+        } else if (curMenu_->brotherMenu != nullptr) // 向右有子菜单
+            curMenu_ = curMenu_->brotherMenu;
+        else {
+            int rows{ curMenu_->childIndex };
+            auto tmenu = __getTopMenu(curMenu_);
+            while (tmenu->childIndex != 0) {
+                rows += tmenu->preMenu->childIndex;
+                tmenu = __getTopMenu(tmenu->preMenu); // 取得顶层菜单
+            }
+            if (tmenu->brotherMenu != nullptr) // 向右且顶层有兄弟菜单
+                tmenu = tmenu->brotherMenu->childMenu;
+            else
+                tmenu = __getTopIndexMenu()->childMenu;
+            while (--rows > 0 && tmenu->childMenu != nullptr)
+                tmenu = tmenu->childMenu;
+            curMenu_ = tmenu;
+        }
         break;
     default:
         break;
     }
 
-    int rightSpaceNum = 2;
     /*
     auto getSameRowMenu = [&](Menu* menu, bool isRight) {
         if (isRight && menu->childMenu) // 向右且有子菜单
@@ -301,14 +356,13 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
         __drawTopMenu(menu);
         return;
     }
-    //*/
 
-    int maxSize = __getMaxSize(curMenu_);
-    SHORT posL = 0, //__getPosL(curMove_),
-        posT = MenuRect.Bottom + curMenu_->childMenu->childIndex,
-          posR = posL + maxSize + rightSpaceNum,
+    SHORT posL = 0,
+          posT = MenuRect.Bottom + curMenu_->childIndex,
+          posR = posL + __getMaxSize(curMenu_) + 2,
           posB = posT + __getBottomMenu(curMenu_)->brotherIndex - curMenu_->brotherIndex;
     SMALL_RECT rect = { posL, posT, posR, posB };
+    //*/
 
     //__writeMenu(__getWstr(curMenu_), rect);
 
@@ -373,24 +427,25 @@ void Console::__writeMove()
 void Console::__writeStatus()
 {
     wostringstream wos{};
-    switch (Areas[areaI_]) {
-    case MENUA:
-        wos << L"【菜单】" << curMenu_->name << L": " << curMenu_->desc;
-        break;
-    case BOARDA:
-        wos << L"【棋盘】";
+    switch (area_) {
+    case MOVEA:
+        wos << L"【着法】";
         break;
     case CURMOVEA:
         wos << L"【详解】";
         break;
-    case MOVEA:
-        wos << L"【着法】";
+    case BOARDA:
+        wos << L"【棋盘】";
+        break;
+    case MENUA:
+        wos << L"【菜单】";
+        if (curMenu_ != rootMenu_)
+            wos << curMenu_->name << L": " << curMenu_->desc;
         break;
     default:
         break;
     }
-    auto wstr = wos.str();
-    __writeAreaLineChars(STATUSATTR[thema_], wstr.c_str(), StatusRect);
+    __writeAreaLineChars(STATUSATTR[thema_], wos.str().c_str(), StatusRect);
 }
 
 void Console::__writeAreaLineChars(WORD attr, const wchar_t* lineChars, const SMALL_RECT& rc, int firstRow, int firstCol, bool cutLine)
@@ -423,7 +478,7 @@ void Console::__writeAreaLineChars(WORD attr, const wchar_t* lineChars, const SM
     while (firstRow-- > 0) // 去掉开始数行
         __getLine();
     int showSize;
-    __cleanArea(attr, rc);
+    __cleanAreaChar(rc);
     for (SHORT row = rc.Top; row <= rc.Bottom; ++row)
         if ((showSize = __getLine() - firstCol) > 0)
             WriteConsoleOutputCharacterW(hOut_, tempLineChar, showSize, COORD{ rc.Left, row }, &rwNum);
