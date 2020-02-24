@@ -51,6 +51,7 @@ static constexpr WORD MOVEATTR[] = { 0x70, 0x1F };
 static constexpr WORD STATUSATTR[] = { 0xF0, 0x5F };
 static constexpr WORD SHADOWATTR[] = { 0x08, 0x82 };
 
+static constexpr WORD SelMenuAttr[] = { 0x70, 0x2F };
 static constexpr WORD RedSideAttr[] = { 0x0C | (BOARDATTR[0] & 0xF0), 0x0C | (BOARDATTR[1] & 0xF0) };
 static constexpr WORD BlackSideAttr[] = { 0x00 | (BOARDATTR[0] & 0xF0), 0x00 | (BOARDATTR[1] & 0xF0) };
 static constexpr WORD CurmoveAttr[] = { 0x0C | (CURMOVEATTR[0] & 0xF0), 0x0C | (CURMOVEATTR[1] & 0xF0) };
@@ -184,6 +185,38 @@ void Console::__operateWin()
 
 bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
 {
+    // 同层菜单顶层
+    auto __getTopMenu = [&](Menu* menu) {
+        while (menu->childIndex == menu->preMenu->childIndex)
+            menu = menu->preMenu;
+        return menu->childMenu;
+    };
+
+    // 同层菜单底部
+    auto __getBottomMenu = [&](Menu* menu) {
+        while (menu->brotherMenu != nullptr)
+            menu = menu->brotherMenu;
+        return menu;
+    };
+
+    // 同层菜单最大尺寸
+    auto __getMaxSize = [&](Menu* menu) {
+        menu = __getTopMenu(menu);
+        int maxSize = menu->name.size();
+        while ((menu = menu->brotherMenu) != nullptr)
+            maxSize = max(maxSize, int(menu->name.size()));
+        return maxSize;
+    };
+
+    // 同层菜单组合成字符串
+    auto __getWstr = [&](Menu* menu) {
+        menu = __getTopMenu(menu);
+        wstring wstr{ menu->name + L'\n' };
+        while ((menu = menu->brotherMenu) != nullptr)
+            wstr += menu->name + L'\n';
+        return wstr;
+    };
+
     bool selected{ false };
     switch (ker.wVirtualKeyCode) {
     case 'F':
@@ -199,15 +232,85 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
         curMenu_ = rootMenu_->brotherMenu->brotherMenu->brotherMenu->brotherMenu;
         break;
     case VK_DOWN:
-        if (curMenu_->brotherMenu)
+        if (curMenu_ == rootMenu_)
+            curMenu_ = curMenu_->brotherMenu;
+        else if (curMenu_->childIndex == 0)
+            curMenu_ = curMenu_->childMenu;
+        else if (curMenu_->brotherMenu != nullptr)
             curMenu_ = curMenu_->brotherMenu;
         else
-            curMenu_ = getTopMenu(curMenu_);
+            curMenu_ = __getTopMenu(curMenu_);
+        break;
+    case VK_UP:
+        if (curMenu_ != __getTopMenu(curMenu_))
+            curMenu_ = curMenu_->preMenu;
+        else
+            curMenu_ = __getBottomMenu(curMenu_);
+        break;
+    case VK_HOME:
+        break;
+    case VK_END:
+        break;
+    case VK_LEFT:
+        break;
+    case VK_RIGHT:
         break;
     default:
         break;
     }
-    //__writeSubMenu(curMenu_, 2);
+
+    int rightSpaceNum = 2;
+    /*
+    auto getSameRowMenu = [&](Menu* menu, bool isRight) {
+        if (isRight && menu->childMenu) // 向右且有子菜单
+            return menu->childMenu;
+        else if (!isRight && menu->preMenu->childIndex < menu->childIndex) // 向左且前项为父菜单
+            return menu->preMenu;
+        Menu* tmenu = getTopMenu(menu);
+        while (tmenu->childIndex != 0)
+            tmenu = getTopMenu(tmenu->preMenu); // 取得顶层菜单
+        if ((isRight && !tmenu->brotherMenu) // 向右且顶层没有兄弟菜单
+            || (!isRight && tmenu->preMenu->brotherIndex == 0)) // 向左且前项菜单为根菜单
+            return menu;
+        return getBottomMenu(isRight ? tmenu->brotherMenu : tmenu->preMenu,
+            menu->brotherIndex - tmenu->brotherIndex + 1);
+    };
+
+    auto __getPosL = [&](Menu* menu) {
+        SHORT width = __getMaxWidth(menu) + rightSpaceNum;
+        while (menu->childIndex != 0) {
+            menu = menu->preMenu; // 取得该级顶层菜单
+            width += __getMaxWidth(menu) + rightSpaceNum;
+        }
+        while (menu->brotherIndex != 0) {
+            width += menu->name.size() + rightSpaceNum;
+            menu = menu->preMenu; // 顶层菜单往左推进
+        }
+        return width + 1; // 最左菜单前留一空白
+    };
+
+    auto __drawTopMenu = [&](Menu* menu) {
+        __cleanAreaAttr(MENUATTR[thema_], MenuRect);
+        FillConsoleOutputAttribute(hOut_, SelMenuAttr[thema_], menu->name.size() + rightSpaceNum,
+            COORD{ __getPosL(menu), MenuRect.Top }, &rwNum);
+    };
+
+    if (menu == nullptr || menu == rootMenu_)
+        return;
+    if (menu->childIndex == 0) { // 菜单顶行
+        __drawTopMenu(menu);
+        return;
+    }
+    //*/
+
+    int maxSize = __getMaxSize(curMenu_);
+    SHORT posL = 0, //__getPosL(curMove_),
+        posT = MenuRect.Bottom + curMenu_->childMenu->childIndex,
+          posR = posL + maxSize + rightSpaceNum,
+          posB = posT + __getBottomMenu(curMenu_)->brotherIndex - curMenu_->brotherIndex;
+    SMALL_RECT rect = { posL, posT, posR, posB };
+
+    //__writeMenu(__getWstr(curMenu_), rect);
 
     return selected;
 }
@@ -224,6 +327,11 @@ void Console::__writeAreas()
     __writeCurmove();
     __writeMove();
     __writeStatus();
+}
+
+void Console::__writeMenu(const wstring& wstr, const SMALL_RECT& rect)
+{
+    __writeAreaLineChars(SelMenuAttr[thema_], wstr.c_str(), rect);
 }
 
 void Console::__writeBoard()
@@ -285,53 +393,6 @@ void Console::__writeStatus()
     __writeAreaLineChars(STATUSATTR[thema_], wstr.c_str(), StatusRect);
 }
 
-void Console::__writeSubMenu(Menu* menu, int rightSpaceNum)
-{
-    function<int(Menu*)> __getMaxWidth = [](Menu* menu) {
-        menu = getTopMenu(menu);
-        int maxWidth = 0;
-        while (menu != nullptr) {
-            int namelen = menu->name.size();
-            if (maxWidth < namelen)
-                maxWidth = namelen;
-            menu = menu->brotherMenu;
-        }
-        return maxWidth;
-    };
-
-    function<wstring(Menu*, int)> __getWstr = [](Menu* menu, int maxWidth) {
-        wstring wstr{};
-        menu = getTopMenu(menu);
-        while (menu != nullptr) {
-            wstr += menu->name + wstring(maxWidth - menu->name.size(), L' ') + L'\n';
-            menu = menu->brotherMenu;
-        }
-        return wstr;
-    };
-
-    function<int(Menu*)> __getPosL = [&](Menu* menu) {
-        int width = __getMaxWidth(menu) + rightSpaceNum;
-        while (menu->childIndex != 0) {
-            menu = menu->preMenu; // 取得该级顶层菜单
-            width += __getMaxWidth(menu) + rightSpaceNum;
-        }
-        while (menu->brotherIndex != 0) {
-            width += menu->name.size() + rightSpaceNum;
-            menu = menu->preMenu; // 顶层菜单往左推进
-        }
-        return width + 1; // 最左菜单前留一空白
-    };
-
-    Menu* cmenu;
-    if (menu == nullptr || (cmenu = menu->childMenu) == nullptr)
-        return;
-    int maxWidth = __getMaxWidth(menu);
-    SHORT posL = __getPosL(menu), posT = MenuRect.Bottom + menu->childMenu->childIndex,
-          posR = posL + maxWidth + rightSpaceNum, posB = posT + getBottomMenu(cmenu)->brotherIndex - cmenu->brotherIndex;
-    SMALL_RECT rect = { posL, posT, posR, posB };
-    __writeAreaLineChars(MENUATTR[thema_], __getWstr(menu, maxWidth).c_str(), rect);
-}
-
 void Console::__writeAreaLineChars(WORD attr, const wchar_t* lineChars, const SMALL_RECT& rc, int firstRow, int firstCol, bool cutLine)
 {
     int cols = rc.Right - rc.Left + 1;
@@ -339,23 +400,21 @@ void Console::__writeAreaLineChars(WORD attr, const wchar_t* lineChars, const SM
     auto __getLine = [&]() {
         int srcIndex = 0, desIndex = 0, showCols = 0;
         wchar_t wch = lineChars[0];
-        if (wch != L'\x0') {
-            while (wch != L'\x0' && wch != L'\n') {
-                tempLineChar[desIndex++] = wch;
-                ++showCols;
-                if (wch >= 0x2500) {
-                    ++showCols; // 显示位置加一
-                    if (wch <= 0x2573) // 制表字符后加一空格 wch >= 0x2500 &&
-                        tempLineChar[desIndex++] = L' ';
-                }
-                wch = lineChars[++srcIndex];
-                // 已至行尾最后一个 或 行尾前一个且下一个为全角
-                if (cutLine && (showCols == cols || (showCols == cols - 1 && wch > 0x2573)))
-                    break;
+        while (wch != L'\x0' && wch != L'\n') {
+            tempLineChar[desIndex++] = wch;
+            ++showCols;
+            if (wch >= 0x2500) {
+                ++showCols; // 显示位置加一
+                if (wch <= 0x2573) // 制表字符后加一空格 wch >= 0x2500 &&
+                    tempLineChar[desIndex++] = L' ';
             }
-            if (wch == L'\n')
-                ++srcIndex;
+            wch = lineChars[++srcIndex];
+            // 已至行尾最后一个 或 行尾前一个且下一个为全角
+            if (cutLine && (showCols == cols || (showCols == cols - 1 && wch > 0x2573)))
+                break;
         }
+        if (wch == L'\n')
+            ++srcIndex; // 消除换行符
         lineChars += srcIndex;
         tempLineChar[desIndex] = L'\x0';
         return desIndex;
@@ -471,45 +530,22 @@ void Console::__initArea(WORD attr, WORD shadowAttr, const SMALL_RECT& rc)
 
 void Console::__cleanArea(WORD attr, const SMALL_RECT& rc)
 {
+    __cleanAreaChar(rc);
+    __cleanAreaAttr(attr, rc);
+}
+
+void Console::__cleanAreaChar(const SMALL_RECT& rc)
+{
     int cols{ rc.Right - rc.Left + 1 };
-    for (SHORT row = rc.Top; row <= rc.Bottom; ++row) {
-        FillConsoleOutputAttribute(hOut_, attr, cols, COORD{ rc.Left, row }, &rwNum);
+    for (SHORT row = rc.Top; row <= rc.Bottom; ++row)
         FillConsoleOutputCharacterW(hOut_, L' ', cols, COORD{ rc.Left, row }, &rwNum);
-    }
 }
 
-Menu* getTopMenu(Menu* menu)
+void Console::__cleanAreaAttr(WORD attr, const SMALL_RECT& rc)
 {
-    if (menu->brotherIndex == 1) // 菜单顶层的brotherIndex==1
-        return menu;
-    int childIndex = menu->childIndex;
-    while (menu->brotherIndex > 1 && menu->childIndex == childIndex)
-        menu = menu->preMenu;
-    return menu->childMenu;
-}
-
-Menu* getBottomMenu(Menu* menu, int row)
-{
-    int index = 0;
-    while (index++ < row && menu->brotherMenu != nullptr)
-        menu = menu->brotherMenu;
-    return menu;
-}
-
-Menu* getSameRowMenu(Menu* menu, bool isRight)
-{
-    if (isRight && menu->childMenu) // 向右且有子菜单
-        return menu->childMenu;
-    else if (!isRight && menu->preMenu->childIndex < menu->childIndex) // 向左且前项为父菜单
-        return menu->preMenu;
-    Menu* tmenu = getTopMenu(menu);
-    while (tmenu->childIndex != 0)
-        tmenu = getTopMenu(tmenu->preMenu); // 取得顶层菜单
-    if ((isRight && !tmenu->brotherMenu) // 向右且顶层没有兄弟菜单
-        || (!isRight && tmenu->preMenu->brotherIndex == 0)) // 向左且前项菜单为根菜单
-        return menu;
-    return getBottomMenu(isRight ? tmenu->brotherMenu : tmenu->preMenu,
-        menu->brotherIndex - tmenu->brotherIndex + 1);
+    int cols{ rc.Right - rc.Left + 1 };
+    for (SHORT row = rc.Top; row <= rc.Bottom; ++row)
+        FillConsoleOutputAttribute(hOut_, attr, cols, COORD{ rc.Left, row }, &rwNum);
 }
 
 void writeCharBuf(CHAR_INFO* charBuf, COORD bufSize, COORD bufCoord, SMALL_RECT& writeRect)
@@ -536,15 +572,6 @@ void setCharBuf(CHAR_INFO* charBuf, COORD charCoord, const wchar_t* wchars, WORD
         while (wchars[wchIndex++] != L'\n')
             ; // 递进到下一行
     }
-}
-
-int getWstrLength(const wstring& wstr)
-{
-    int len = wstr.size();
-    for (auto& wch : wstr)
-        if (wch > 0x2573) // 非制表符 // 中文高8位非0:HIBYTE((WORD)wch)
-            ++len;
-    return len;
 }
 
 /*

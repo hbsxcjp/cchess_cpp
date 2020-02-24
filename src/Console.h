@@ -67,32 +67,23 @@ private:
     void __operateCurMove(WORD key);
 
     void __writeAreas();
+    void __writeMenu(const wstring& wstr, const SMALL_RECT& rect);
     void __writeBoard();
     void __writeCurmove();
     void __writeMove();
     void __writeStatus();
-    void __writeSubMenu(Menu* menu, int rightSpaceNum);
     void __writeAreaLineChars(WORD attr, const wchar_t* lineChars, const SMALL_RECT& rc, int firstRow = 0, int firstCol = 0, bool cutLine = false);
 
     void __initMenu();
     void __initArea(WORD attr, WORD shadowAttr, const SMALL_RECT& rc);
     void __cleanArea(WORD attr, const SMALL_RECT& rc);
+    void __cleanAreaChar(const SMALL_RECT& rc);
+    void __cleanAreaAttr(WORD attr, const SMALL_RECT& rc);
 };
-
-// 选定菜单定位至顶层菜单
-Menu* getTopMenu(Menu* menu);
-// 选定菜单定位至底层菜单
-Menu* getBottomMenu(Menu* menu, int row = 100);
-// 选定菜单定位至左边或右边相同或相近层菜单
-Menu* getSameRowMenu(Menu* menu, bool isRight);
-
-// 清除内容
 
 void writeCharBuf(CHAR_INFO* charBuf, COORD bufSize, COORD bufCoord, SMALL_RECT& writeRect);
 void setCharBuf(CHAR_INFO* charBuf, COORD charCoord, const wchar_t* wchars, WORD attr);
 
-// 取得宽字符串所占的屏幕宽度
-int getWstrLength(const wstring& wstr);
 }
 
 #endif
