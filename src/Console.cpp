@@ -8,15 +8,19 @@ static constexpr int CHARSSIZE = 1024;
 static DWORD rwNum; // 公用变量
 static constexpr wchar_t PROGRAMNAME[] = L"中国象棋 ";
 
-static constexpr SHORT WINROWS = 45, WINCOLS = 130;
+static constexpr SHORT WINROWS = 47, WINCOLS = 130;
 static constexpr COORD HOMEPOS = { 0, 0 };
 static constexpr SHORT BOARDROWS = 10 + 9, BOARDCOLS = (9 + 8) * 2, BOARDTITLEH = 2;
 static constexpr SHORT SHADOWCOLS = 2, SHADOWROWS = 1, BORDERCOLS = 2, BORDERROWS = 1;
 static constexpr SHORT STATUSROWS = 2;
 
 static constexpr SMALL_RECT WINRECT = { 0, 0, SHORT(WINCOLS - 1), SHORT(WINROWS - 1) };
-static constexpr SMALL_RECT MenuRect = { WINRECT.Left, WINRECT.Top, WINRECT.Right, 0 };
-static constexpr SMALL_RECT StatusRect = { WINRECT.Left, SHORT(WINRECT.Bottom - STATUSROWS + 1), WINRECT.Right, WINRECT.Bottom };
+
+static constexpr SMALL_RECT MenuRect = { WINRECT.Left, WINRECT.Top, WINRECT.Right, SHADOWROWS };
+static constexpr SMALL_RECT iMenuRect = { MenuRect.Left, MenuRect.Top, SHORT(MenuRect.Right - SHADOWCOLS), SHORT(MenuRect.Bottom - 1) };
+
+static constexpr SMALL_RECT StatusRect = { WINRECT.Left, SHORT(WINRECT.Bottom - STATUSROWS - SHADOWROWS + 1), WINRECT.Right, WINRECT.Bottom };
+static constexpr SMALL_RECT iStatusRect = { StatusRect.Left, StatusRect.Top, SHORT(StatusRect.Right - SHADOWCOLS), SHORT(StatusRect.Bottom - 1) };
 
 static constexpr SMALL_RECT BoardRect = { WINRECT.Left + SHADOWCOLS, SHORT(MenuRect.Bottom + 1 + SHADOWROWS),
     SHORT(WINRECT.Left + 1 + BOARDCOLS + BORDERCOLS * 2 + SHADOWCOLS * 2), SHORT(MenuRect.Bottom + BOARDROWS + (SHADOWROWS + BORDERROWS + BOARDTITLEH) * 2) };
@@ -86,6 +90,17 @@ Console::Console(const string& fileName)
     //SetConsoleTextAttribute(hOut_, WINATTR[thema_]);
     //GetConsoleScreenBufferInfo(hOut_, &bInfo); // 获取窗口信息
 
+    __cleanAreaAttr(WINATTR[thema_], WINRECT);
+    __initArea(MENUATTR[thema_], MenuRect, false);
+    __initArea(STATUSATTR[thema_], StatusRect, false);
+    map<WORD, SMALL_RECT> rectAttrs = {
+        { BOARDATTR[thema_], BoardRect },
+        { CURMOVEATTR[thema_], CurmoveRect },
+        { MOVEATTR[thema_], MoveRect }
+    };
+    for (const auto& rectAttr : rectAttrs)
+        __initArea(rectAttr.first, rectAttr.second);
+
     __initMenu();
 
     __writeAreas();
@@ -111,22 +126,23 @@ void Console::__operateWin()
 {
     int oldArea{ area_ };
     auto __keyEventProc = [&](const KEY_EVENT_RECORD& ker) {
-        if (ker.bKeyDown)
+        if (!ker.bKeyDown)
             return;
         WORD key = ker.wVirtualKeyCode;
         if (key == VK_TAB) {
+            if (area_ == MENUA)
+                __cleanSubMenuArea();
             area_ = (area_ + ((ker.dwControlKeyState & SHIFT_PRESSED) ? -1 : 1) + 4) % 4; // 四个区域循环
-            //__writeAreas();
+            __writeStatus();
             return;
         }
         if (ker.dwControlKeyState & (LEFT_ALT_PRESSED | RIGHT_ALT_PRESSED)) {
-            if (key == 'F' || key == 'B' || key == 'S' || key == 'A') {
-                oldArea = area_;
-                area_ = MENUA;
-            } else {
+            if (area_ == MENUA) {
+                __cleanSubMenuArea();
                 area_ = oldArea;
                 return;
-            }
+            } else
+                area_ = MENUA;
         }
         switch (area_) { // 区分不同区域, 进行操作
         case MOVEA:
@@ -158,13 +174,9 @@ void Console::__operateWin()
             auto ker = irInBuf[i].Event.KeyEvent;
             switch (irInBuf[i].EventType) {
             case KEY_EVENT: // keyboard input
-                if (ker.wVirtualKeyCode == VK_ESCAPE) {
-                    if (area_ == MENUA) {
-                        __writeAreas();
-                        area_ = oldArea;
-                    } else
-                        return;
-                }
+                if (ker.wVirtualKeyCode == VK_ESCAPE && ker.bKeyDown
+                    && area_ != MENUA)
+                    return;
                 __keyEventProc(ker);
                 break;
             case MOUSE_EVENT: // mouse input
@@ -173,8 +185,8 @@ void Console::__operateWin()
             default:
                 break;
             }
-            //if (!ker.bKeyDown)
-            //    __writeStatus();
+            if (ker.bKeyDown)
+                __writeStatus();
         }
     }
 }
@@ -214,16 +226,16 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
     bool selected{ false };
     switch (ker.wVirtualKeyCode) {
     case 'F':
-        curMenu_ = __getTopIndexMenu();
+        curMenu_ = __getTopIndexMenu()->childMenu;
         break;
     case 'B':
-        curMenu_ = __getTopIndexMenu(1);
+        curMenu_ = __getTopIndexMenu(1)->childMenu;
         break;
     case 'S':
-        curMenu_ = __getTopIndexMenu(2);
+        curMenu_ = __getTopIndexMenu(2)->childMenu;
         break;
     case 'A':
-        curMenu_ = __getTopIndexMenu(3);
+        curMenu_ = __getTopIndexMenu(3)->childMenu;
         break;
     case VK_DOWN:
         if (curMenu_ == rootMenu_)
@@ -275,7 +287,12 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
             curMenu_ = __getLevelTopMenu(tmenu, curMenu_->childIndex);
         }
         break;
+    case VK_RETURN:
+    case VK_ESCAPE:
+        selected = true;
+        break;
     default:
+        curMenu_ = __getTopIndexMenu();
         break;
     }
 
@@ -313,18 +330,22 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
         return selected;
     SHORT level = curMenu_->childIndex;
     SHORT posL = __getPosL(curMenu_),
-          posT = MenuRect.Bottom + (level == 0 ? 0 : 1),
-          posR = posL + (level == 0 ? __getTopSize(curMenu_) : __getMaxSize(curMenu_)),
-          posB = posT + (level == 0 ? 0 : __getBottomMenu(curMenu_)->childIndex - 1);
+          posT = iMenuRect.Bottom + (level == 0 ? 0 : 1),
+          posR = posL + (level == 0 ? __getTopSize(curMenu_) : __getMaxSize(curMenu_)) + SHADOWCOLS,
+          posB = posT + (level == 0 ? 0 : __getBottomMenu(curMenu_)->childIndex - 1) + SHADOWROWS;
 
     SMALL_RECT rect = { posL, posT, posR, posB };
-    __writeAreas();
-    if (level > 0)
-        __cleanArea(ShowMenuAttr[thema_], rect);
-    __cleanAreaAttr(SelMenuAttr[thema_], SMALL_RECT{ rect.Left, level, rect.Right, level });
-    if (level > 0)
-        __writeAreaLineChars(SelMenuAttr[thema_], __getWstr(curMenu_).c_str(), rect);
 
+    __cleanSubMenuArea();
+    if (!selected) {
+        if (level > 0) {
+            //__cleanArea(ShowMenuAttr[thema_], rect);
+            __initArea(ShowMenuAttr[thema_], rect, false);
+            __writeAreaLineChars(SelMenuAttr[thema_], __getWstr(curMenu_).c_str(), rect);
+        }
+        __cleanAreaAttr(SelMenuAttr[thema_], SMALL_RECT{ rect.Left, level, SHORT(rect.Right - SHADOWCOLS), level }); // 位置在clean之后
+        __writeStatus();
+    }
     return selected;
 }
 
@@ -336,17 +357,6 @@ void Console::__operateCurMove(WORD key) {}
 
 void Console::__writeAreas()
 {
-    __cleanAreaAttr(WINATTR[thema_], WINRECT);
-    __cleanAreaAttr(MENUATTR[thema_], MenuRect);
-    __cleanAreaAttr(STATUSATTR[thema_], StatusRect);
-    map<WORD, SMALL_RECT> rectAttrs = {
-        { BOARDATTR[thema_], BoardRect },
-        { CURMOVEATTR[thema_], CurmoveRect },
-        { MOVEATTR[thema_], MoveRect }
-    };
-    for (const auto& rectAttr : rectAttrs)
-        __initArea(rectAttr.first, SHADOWATTR[thema_], rectAttr.second);
-
     __writeBoard();
     __writeCurmove();
     __writeMove();
@@ -410,7 +420,8 @@ void Console::__writeStatus()
     default:
         break;
     }
-    __writeAreaLineChars(STATUSATTR[thema_], wos.str().c_str(), StatusRect);
+    __cleanAreaChar(iStatusRect);
+    __writeAreaLineChars(STATUSATTR[thema_], wos.str().c_str(), iStatusRect);
 }
 
 void Console::__writeAreaLineChars(WORD attr, const wchar_t* lineChars, const SMALL_RECT& rc, int firstRow, int firstCol, bool cutLine)
@@ -523,29 +534,71 @@ void Console::__initMenu()
     curMenu_ = rootMenu_;
 }
 
-void Console::__initArea(WORD attr, WORD shadowAttr, const SMALL_RECT& rc)
+void Console::__initArea(WORD attr, const SMALL_RECT& rc, bool drawFrame)
 {
     SMALL_RECT irc = { rc.Left, rc.Top, SHORT(rc.Right - SHADOWCOLS), SHORT(rc.Bottom - SHADOWROWS) };
     __cleanArea(attr, irc);
-    SHORT left = irc.Left + 1, right = irc.Right - 1;
-    const wchar_t* const tabChar = TabChars[thema_];
-    for (auto row : { irc.Top, irc.Bottom }) // 顶、底行
-        FillConsoleOutputCharacterW(hOut_, tabChar[0], irc.Right - irc.Left - 2, { left, row }, &rwNum);
-    for (SHORT row = irc.Top + 1; row < irc.Bottom; ++row)
-        for (SHORT col : { irc.Left, right })
-            FillConsoleOutputCharacterW(hOut_, tabChar[1], 1, { col, row }, &rwNum);
-    map<wchar_t, COORD> wchCoords = {
-        { tabChar[2], { irc.Left, irc.Top } },
-        { tabChar[3], { right, irc.Top } },
-        { tabChar[4], { irc.Left, irc.Bottom } },
-        { tabChar[5], { right, irc.Bottom } },
-    };
-    for (const auto& wchCoord : wchCoords)
-        FillConsoleOutputCharacterW(hOut_, wchCoord.first, 1, wchCoord.second, &rwNum);
-    // 底、右阴影色
-    FillConsoleOutputAttribute(hOut_, shadowAttr, rc.Right - rc.Left + 1 - BORDERCOLS, { SHORT(rc.Left + BORDERCOLS), rc.Bottom }, &rwNum);
-    for (SHORT row = rc.Top + 1; row <= rc.Bottom; ++row)
-        FillConsoleOutputAttribute(hOut_, shadowAttr, 2, { SHORT(rc.Right - 1), row }, &rwNum);
+    __initAreaShadow(rc);
+
+    if (drawFrame) {
+        SHORT left = irc.Left + 1, right = irc.Right - 1;
+        const wchar_t* const tabChar = TabChars[thema_];
+        for (auto row : { irc.Top, irc.Bottom }) // 顶、底行
+            FillConsoleOutputCharacterW(hOut_, tabChar[0], irc.Right - irc.Left - 2, { left, row }, &rwNum);
+        for (SHORT row = irc.Top + 1; row < irc.Bottom; ++row)
+            for (SHORT col : { irc.Left, right })
+                FillConsoleOutputCharacterW(hOut_, tabChar[1], 1, { col, row }, &rwNum);
+        map<wchar_t, COORD>
+            wchCoords = {
+                { tabChar[2], { irc.Left, irc.Top } },
+                { tabChar[3], { right, irc.Top } },
+                { tabChar[4], { irc.Left, irc.Bottom } },
+                { tabChar[5], { right, irc.Bottom } },
+            };
+        for (const auto& wchCoord : wchCoords)
+            FillConsoleOutputCharacterW(hOut_, wchCoord.first, 1, wchCoord.second, &rwNum);
+    }
+}
+
+void Console::__initAreaShadow(const SMALL_RECT& rc)
+{
+    //FillConsoleOutputAttribute(hOut_, WINATTR[thema_], SHADOWCOLS, { rc.Left, rc.Bottom }, &rwNum);
+    FillConsoleOutputAttribute(hOut_, SHADOWATTR[thema_], rc.Right - rc.Left + 1 - SHADOWCOLS, { SHORT(rc.Left + SHADOWCOLS), rc.Bottom }, &rwNum);
+    SHORT right = rc.Right - SHADOWCOLS + 1;
+    //if (rc.Bottom > rc.Top + 1)
+    //    FillConsoleOutputAttribute(hOut_, WINATTR[thema_], SHADOWCOLS, { right, rc.Top }, &rwNum);
+    for (SHORT row = rc.Top + (rc.Bottom > rc.Top + 1 ? 1 : 0); row <= rc.Bottom; ++row)
+        FillConsoleOutputAttribute(hOut_, SHADOWATTR[thema_], 2, { right, row }, &rwNum);
+}
+
+void Console::__cleanAreaWIN()
+{
+    int colWidth = 2;
+    SMALL_RECT rc = { WINRECT.Left, MenuRect.Bottom + 1, WINRECT.Right, StatusRect.Top - 1 };
+    for (auto row : { rc.Top, rc.Bottom }) { // 顶、底行
+        int width = rc.Right - rc.Left + 1;
+        COORD pos = { rc.Left, row };
+        FillConsoleOutputAttribute(hOut_, WINATTR[thema_], width, pos, &rwNum);
+        FillConsoleOutputCharacterW(hOut_, L' ', width, pos, &rwNum);
+    }
+    for (SHORT row = rc.Top; row < rc.Bottom; ++row) // 左、右列
+        for (SHORT col : { rc.Left, SHORT(rc.Right - colWidth + 1) }) {
+            COORD pos = { col, row };
+            FillConsoleOutputAttribute(hOut_, WINATTR[thema_], colWidth, pos, &rwNum);
+            FillConsoleOutputCharacterW(hOut_, L' ', colWidth, pos, &rwNum);
+        }
+}
+
+void Console::__cleanSubMenuArea()
+{
+    __cleanAreaAttr(MENUATTR[thema_], iMenuRect);
+    FillConsoleOutputCharacterW(hOut_, L' ', WINCOLS, { MenuRect.Left, MenuRect.Bottom }, &rwNum);
+    FillConsoleOutputAttribute(hOut_, WINATTR[thema_], SHADOWCOLS, { MenuRect.Left, MenuRect.Bottom }, &rwNum);
+    __initAreaShadow(MenuRect);
+
+    __cleanAreaWIN();
+    __initArea(BOARDATTR[thema_], BoardRect);
+    __writeBoard();
 }
 
 void Console::__cleanArea(WORD attr, const SMALL_RECT& rc)

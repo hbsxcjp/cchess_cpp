@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include <windows.h>
 
-
 namespace ConsoleSpace {
 
 // 控制台焦点区域类型
@@ -57,13 +56,14 @@ private:
     int cmFirstRow_{}, cmFirstCol_{}, mFirstRow_{}, mFirstCol_{};
 
     void __operateWin();
+
     bool __operateMenu(const KEY_EVENT_RECORD& ker);
     void __operateBoard(WORD key);
     void __operateMove(WORD key);
     void __operateCurMove(WORD key);
 
     void __writeAreas();
-    
+
     void __writeBoard();
     void __writeCurmove();
     void __writeMove();
@@ -71,7 +71,13 @@ private:
     void __writeAreaLineChars(WORD attr, const wchar_t* lineChars, const SMALL_RECT& rc, int firstRow = 0, int firstCol = 0, bool cutLine = false);
 
     void __initMenu();
-    void __initArea(WORD attr, WORD shadowAttr, const SMALL_RECT& rc);
+    void __initArea(WORD attr, const SMALL_RECT& rc, bool drawFrame = true);
+
+    // 底、右阴影色
+    void __initAreaShadow(const SMALL_RECT& rc);
+
+    void __cleanAreaWIN();
+    void __cleanSubMenuArea();
     void __cleanArea(WORD attr, const SMALL_RECT& rc);
     void __cleanAreaChar(const SMALL_RECT& rc);
     void __cleanAreaAttr(WORD attr, const SMALL_RECT& rc);
@@ -79,7 +85,6 @@ private:
 
 void writeCharBuf(CHAR_INFO* charBuf, COORD bufSize, COORD bufCoord, SMALL_RECT& writeRect);
 void setCharBuf(CHAR_INFO* charBuf, COORD charCoord, const wchar_t* wchars, WORD attr);
-
 }
 
 #endif
