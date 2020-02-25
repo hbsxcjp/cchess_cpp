@@ -63,7 +63,7 @@ private:
     void __operateCurMove(WORD key);
 
     void __writeAreas();
-    void __writeMenu(const wstring& wstr, const SMALL_RECT& rect);
+    
     void __writeBoard();
     void __writeCurmove();
     void __writeMove();
