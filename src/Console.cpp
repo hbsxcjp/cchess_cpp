@@ -16,11 +16,15 @@ static constexpr SHORT STATUSROWS = 2;
 
 static constexpr SMALL_RECT WINRECT = { 0, 0, SHORT(WINCOLS - 1), SHORT(WINROWS - 1) };
 
-static constexpr SMALL_RECT MenuRect = { WINRECT.Left, WINRECT.Top, WINRECT.Right, SHADOWROWS };
-static constexpr SMALL_RECT iMenuRect = { MenuRect.Left, MenuRect.Top, SHORT(MenuRect.Right - SHADOWCOLS), SHORT(MenuRect.Bottom - 1) };
+static constexpr SMALL_RECT MenuRect = { WINRECT.Left + SHADOWCOLS, WINRECT.Top,
+    WINRECT.Right - SHADOWCOLS, SHADOWROWS };
+static constexpr SMALL_RECT iMenuRect = { MenuRect.Left, MenuRect.Top,
+    SHORT(MenuRect.Right - BORDERCOLS - SHADOWCOLS), SHORT(MenuRect.Bottom - 1) };
 
-static constexpr SMALL_RECT StatusRect = { WINRECT.Left, SHORT(WINRECT.Bottom - STATUSROWS - SHADOWROWS + 1), WINRECT.Right, WINRECT.Bottom };
-static constexpr SMALL_RECT iStatusRect = { StatusRect.Left, StatusRect.Top, SHORT(StatusRect.Right - SHADOWCOLS), SHORT(StatusRect.Bottom - 1) };
+static constexpr SMALL_RECT StatusRect = { WINRECT.Left + SHADOWCOLS, SHORT(WINRECT.Bottom - STATUSROWS - SHADOWROWS + 1),
+    SHORT(WINRECT.Right - SHADOWCOLS), WINRECT.Bottom };
+static constexpr SMALL_RECT iStatusRect = { StatusRect.Left, StatusRect.Top,
+    SHORT(StatusRect.Right - BORDERCOLS - SHADOWCOLS), SHORT(StatusRect.Bottom - 1) };
 
 static constexpr SMALL_RECT BoardRect = { WINRECT.Left + SHADOWCOLS, SHORT(MenuRect.Bottom + 1 + SHADOWROWS),
     SHORT(WINRECT.Left + 1 + BOARDCOLS + BORDERCOLS * 2 + SHADOWCOLS * 2), SHORT(MenuRect.Bottom + BOARDROWS + (SHADOWROWS + BORDERROWS + BOARDTITLEH) * 2) };
@@ -126,24 +130,28 @@ void Console::__operateWin()
 {
     int oldArea{ area_ };
     auto __keyEventProc = [&](const KEY_EVENT_RECORD& ker) {
-        if (!ker.bKeyDown)
-            return;
         WORD key = ker.wVirtualKeyCode;
-        if (key == VK_TAB) {
+        if (ker.bKeyDown && key == VK_TAB) {
             if (area_ == MENUA)
                 __cleanSubMenuArea();
             area_ = (area_ + ((ker.dwControlKeyState & SHIFT_PRESSED) ? -1 : 1) + 4) % 4; // 四个区域循环
             __writeStatus();
             return;
         }
-        if (ker.dwControlKeyState & (LEFT_ALT_PRESSED | RIGHT_ALT_PRESSED)) {
-            if (area_ == MENUA) {
-                __cleanSubMenuArea();
-                area_ = oldArea;
-                return;
+        if (ker.bKeyDown && ker.dwControlKeyState & (LEFT_ALT_PRESSED | RIGHT_ALT_PRESSED)) {
+            /*
+            if (!ker.bKeyDown) {
+                if (area_ == MENUA) {
+                    __cleanSubMenuArea();
+                    area_ = oldArea;
+                    return;
+                }
             } else
-                area_ = MENUA;
+                //*/
+            area_ = MENUA;
         }
+        if (!ker.bKeyDown)
+            return;
         switch (area_) { // 区分不同区域, 进行操作
         case MOVEA:
             __operateMove(key);
@@ -168,12 +176,13 @@ void Console::__operateWin()
     };
 
     INPUT_RECORD irInBuf[128];
+    KEY_EVENT_RECORD ker;
     while (true) {
         ReadConsoleInput(hIn_, irInBuf, 128, &rwNum);
         for (DWORD i = 0; i < rwNum; i++) {
-            auto ker = irInBuf[i].Event.KeyEvent;
             switch (irInBuf[i].EventType) {
             case KEY_EVENT: // keyboard input
+                ker = irInBuf[i].Event.KeyEvent;
                 if (ker.wVirtualKeyCode == VK_ESCAPE && ker.bKeyDown
                     && area_ != MENUA)
                     return;
@@ -292,7 +301,7 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
         selected = true;
         break;
     default:
-        curMenu_ = __getTopIndexMenu();
+        //curMenu_ = __getTopIndexMenu();
         break;
     }
 
@@ -329,7 +338,7 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
     if (curMenu_ == nullptr || curMenu_ == rootMenu_)
         return selected;
     SHORT level = curMenu_->childIndex;
-    SHORT posL = __getPosL(curMenu_),
+    SHORT posL = __getPosL(curMenu_) + SHADOWCOLS,
           posT = iMenuRect.Bottom + (level == 0 ? 0 : 1),
           posR = posL + (level == 0 ? __getTopSize(curMenu_) : __getMaxSize(curMenu_)) + SHADOWCOLS,
           posB = posT + (level == 0 ? 0 : __getBottomMenu(curMenu_)->childIndex - 1) + SHADOWROWS;
@@ -524,12 +533,12 @@ void Console::__initMenu()
 
     // 绘制菜单区域
     brotherMenu = rootMenu_;
-    int width = 0;
+    int pos = SHADOWCOLS;
     while ((brotherMenu = brotherMenu->brotherMenu)) {
         int namelen = brotherMenu->name.size();
         WriteConsoleOutputCharacterW(hOut_, brotherMenu->name.c_str(), namelen,
-            { SHORT(width), MenuRect.Top }, &rwNum);
-        width += namelen + 3;
+            { SHORT(pos), MenuRect.Top }, &rwNum);
+        pos += namelen + 3;
     }
     curMenu_ = rootMenu_;
 }
