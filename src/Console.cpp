@@ -157,6 +157,7 @@ void Console::__operateWin()
         switch (area_) { // 区分不同区域, 进行操作
         case MOVEA:
             __operateMove(ker);
+            __writeAreas();
             break;
         case CURMOVEA:
             __operateCurMove(ker);
@@ -196,8 +197,6 @@ void Console::__operateWin()
             default:
                 break;
             }
-            if (ker.bKeyDown)
-                __writeAreas();
         }
     }
 }
@@ -219,9 +218,10 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
         return menu;
     };
 
-    // 同组菜单第n个
-    auto __getLevelTopMenu = [&](Menu* menu, int level) {
-        //menu = __getTopMenu(menu);
+    // 向左或右菜单第n个
+    auto __getSameLevelMenu = [&](Menu* menu, bool isLeft) {
+        int level{ menu->childIndex };
+        menu = __getTopIndexMenu((__getTopMenu(menu)->brotherIndex - 1 + (isLeft ? -1 : 1) + 4) % 4);
         while (level-- > 0 && menu->childMenu != nullptr)
             menu = menu->childMenu;
         return menu;
@@ -269,28 +269,10 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
         curMenu_ = __getBottomMenu(curMenu_);
         break;
     case VK_LEFT:
-        if (curMenu_->childIndex == 0) // 顶层菜单
-            curMenu_ = __getTopIndexMenu((curMenu_->brotherIndex - 1 + 4) % 4);
-        else {
-            auto tmenu = __getTopMenu(curMenu_);
-            if (tmenu->brotherIndex > 0) // 向左
-                tmenu = tmenu->preMenu;
-            else
-                tmenu = __getTopIndexMenu(3);
-            curMenu_ = __getLevelTopMenu(tmenu, curMenu_->childIndex);
-        }
+        curMenu_ = __getSameLevelMenu(curMenu_, true);
         break;
     case VK_RIGHT:
-        if (curMenu_->childIndex == 0) // 顶层菜单
-            curMenu_ = __getTopIndexMenu((curMenu_->brotherIndex + 1 + 4) % 4);
-        else {
-            auto tmenu = __getTopMenu(curMenu_);
-            if (tmenu->brotherMenu != nullptr) // 向右
-                tmenu = tmenu->brotherMenu;
-            else
-                tmenu = __getTopIndexMenu();
-            curMenu_ = __getLevelTopMenu(tmenu, curMenu_->childIndex);
-        }
+        curMenu_ = __getSameLevelMenu(curMenu_, false);
         break;
     case VK_RETURN:
     case VK_ESCAPE:
@@ -298,7 +280,6 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
         break;
     default:
         isExitMenu = true;
-        //curMenu_ = __getTopIndexMenu();
         break;
     }
 
@@ -345,7 +326,6 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
     __cleanSubMenuArea();
     if (!isExitMenu) {
         if (level > 0) {
-            //__cleanArea(ShowMenuAttr[thema_], rect);
             __initArea(ShowMenuAttr[thema_], rect, false);
             __writeAreaLineChars(SelMenuAttr[thema_], __getWstr(curMenu_).c_str(), rect);
         }
@@ -401,6 +381,7 @@ void Console::__writeBoard()
     bool bottomIsRed{ cm_->isBottomSide(PieceColor::RED) };
     WORD bottomAttr{ bottomIsRed ? RedSideAttr[thema_] : BlackSideAttr[thema_] },
         topAttr{ bottomIsRed ? BlackSideAttr[thema_] : RedSideAttr[thema_] };
+    __cleanAreaAttr(BOARDATTR[thema_], iBoardRect);
     // 顶、底两行上颜色
     for (int row = 0; row < BOARDTITLEH; ++row) {
         FillConsoleOutputAttribute(hOut_, topAttr, BOARDCOLS, { iBoardRect.Left, SHORT(iBoardRect.Top + row) }, &rwNum);
@@ -429,6 +410,7 @@ void Console::__writeCurmove()
 void Console::__writeMove()
 {
     __writeAreaLineChars(MOVEATTR[thema_], cm_->getMoveStr().c_str(), iMoveRect, mFirstRow_, mFirstCol_);
+    __cleanAreaAttr(MOVEATTR[thema_], iMoveRect);
     auto curCoord = cm_->getMoveCoord();
     COORD showCoord = { SHORT(iMoveRect.Left + curCoord.first * 5 * 2), SHORT(iMoveRect.Top + curCoord.second * 2) };
     FillConsoleOutputAttribute(hOut_, SelMoveAttr[thema_], 4 * 2, showCoord, &rwNum);
@@ -455,7 +437,6 @@ void Console::__writeStatus()
     default:
         break;
     }
-    __cleanAreaChar(iStatusRect);
     __writeAreaLineChars(STATUSATTR[thema_], wos.str().c_str(), iStatusRect);
 }
 
@@ -482,8 +463,8 @@ void Console::__writeAreaLineChars(WORD attr, const wchar_t* lineChars, const SM
         if (wch == L'\n')
             ++srcIndex; // 消除换行符
         lineChars += srcIndex;
-        if ((cols - showCols) % 2 == 1)
-            tempLineChar[desIndex++] = L'.'; // 对齐中文
+        //if ((cols - showCols) % 2 == 1)
+        //    tempLineChar[desIndex++] = L'.'; // 对齐中文
         tempLineChar[desIndex] = L'\x0';
         return desIndex;
     };
@@ -491,7 +472,7 @@ void Console::__writeAreaLineChars(WORD attr, const wchar_t* lineChars, const SM
     while (firstRow-- > 0) // 去掉开始数行
         __getLine();
     int showSize;
-    //__cleanAreaChar(rc);
+    __cleanAreaChar(rc);
     for (SHORT row = rc.Top; row <= rc.Bottom; ++row)
         if ((showSize = __getLine() - firstCol) > 0)
             WriteConsoleOutputCharacterW(hOut_, tempLineChar, showSize, COORD{ rc.Left, row }, &rwNum);
@@ -574,7 +555,8 @@ void Console::__initMenu()
 void Console::__initArea(WORD attr, const SMALL_RECT& rc, bool drawFrame)
 {
     SMALL_RECT irc = { rc.Left, rc.Top, SHORT(rc.Right - SHADOWCOLS), SHORT(rc.Bottom - SHADOWROWS) };
-    __cleanArea(attr, irc);
+    __cleanAreaChar(irc);
+    __cleanAreaAttr(attr, irc);
     __initAreaShadow(rc);
 
     if (drawFrame) {
@@ -636,12 +618,6 @@ void Console::__cleanSubMenuArea()
     __cleanAreaWIN();
     __initArea(BOARDATTR[thema_], BoardRect);
     __writeBoard();
-}
-
-void Console::__cleanArea(WORD attr, const SMALL_RECT& rc)
-{
-    __cleanAreaChar(rc);
-    __cleanAreaAttr(attr, rc);
 }
 
 void Console::__cleanAreaChar(const SMALL_RECT& rc)

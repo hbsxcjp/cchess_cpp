@@ -78,7 +78,7 @@ private:
 
     void __cleanAreaWIN();
     void __cleanSubMenuArea();
-    void __cleanArea(WORD attr, const SMALL_RECT& rc);
+    
     void __cleanAreaChar(const SMALL_RECT& rc);
     void __cleanAreaAttr(WORD attr, const SMALL_RECT& rc);
 };
