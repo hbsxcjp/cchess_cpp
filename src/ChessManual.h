@@ -1,4 +1,4 @@
-#ifndef CHESSMANUAL_H
+﻿#ifndef CHESSMANUAL_H
 #define CHESSMANUAL_H
 // 中国象棋棋盘布局类型 by-cjp
 
@@ -77,16 +77,16 @@ public:
     void read(const string& infilename);
     void write(const string& outfilename);
 
-    void done(const SMove& move);
-    void undo(const SMove& move);
     void go();
     void back();
-    void backTo(const SMove& move);
     void goOther();
     void goInc(int inc);
+    void goEnd();
+    void backFirst();
 
     void changeSide(ChangeType ct);
 
+    RowCol_pair getMoveCoord() const { return { currentMove_->CC_ColNo(), currentMove_->nextNo() }; }
     int getMovCount() const { return movCount_; }
     int getRemCount() const { return remCount_; }
     int getRemLenMax() const { return remLenMax_; }
@@ -105,6 +105,10 @@ private:
     SBoard board_;
     SMove rootMove_, currentMove_;
     int movCount_{ 0 }, remCount_{ 0 }, remLenMax_{ 0 }, maxRow_{ 0 }, maxCol_{ 0 };
+
+    void __backTo(const SMove& move);
+    void __done(const SMove& move);
+    void __undo(const SMove& move);
 
     void __setFENplusFromFEN(const wstring& FEN, PieceColor color);
     void __setBoardFromInfo();

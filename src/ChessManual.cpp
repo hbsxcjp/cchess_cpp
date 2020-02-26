@@ -88,7 +88,7 @@ const wstring ChessManual::Move::toString()
 
     wos << L"注解：" << remark() << L'\n'
         << L" next:" << nextNo_ << L" other:" << otherNo_ << L" CC_Col:" << CC_ColNo_ << L'\n';
-        
+
     return wos.str();
 }
 
@@ -152,44 +152,28 @@ shared_ptr<ChessManual::Move>& ChessManual::addOtherMove(
     return move->addOther(__getPRowCol_pair(str, fmt), remark);
 }
 
-void ChessManual::done(const SMove& move)
-{
-    move->setEatPie(board_->doneMove(move->getPRowCol_pair()));
-}
-
-void ChessManual::undo(const SMove& move)
-{
-    board_->undoMove(move->getPRowCol_pair(), move->eatPie());
-}
-
 void ChessManual::go()
 {
     if (currentMove_->next()) {
         currentMove_ = currentMove_->next();
-        done(currentMove_);
+        __done(currentMove_);
     }
 }
 
 void ChessManual::back()
 {
     if (currentMove_->prev()) {
-        undo(currentMove_);
+        __undo(currentMove_);
         currentMove_ = currentMove_->prev();
     }
-}
-
-void ChessManual::backTo(const SMove& move)
-{
-    while (currentMove_ != rootMove_ && currentMove_ != move)
-        back();
 }
 
 void ChessManual::goOther()
 {
     if (currentMove_ != rootMove_ && currentMove_->other()) {
-        undo(currentMove_);
+        __undo(currentMove_);
         currentMove_ = currentMove_->other();
-        done(currentMove_);
+        __done(currentMove_);
     }
 }
 
@@ -201,12 +185,23 @@ void ChessManual::goInc(int inc)
         fbward(this);
 }
 
+void ChessManual::goEnd()
+{
+    while (currentMove_->next())
+        go();
+}
+
+void ChessManual::backFirst()
+{
+    __backTo(rootMove_);
+}
+
 void ChessManual::changeSide(ChangeType ct)
 {
     vector<SMove> prevMoves{};
     if (currentMove_ != rootMove_)
         prevMoves = currentMove_->getPrevMoves();
-    backTo(rootMove_);
+    __backTo(rootMove_);
     board_->changeSide(ct);
 
     if (ct != ChangeType::EXCHANGE) {
@@ -230,7 +225,7 @@ void ChessManual::changeSide(ChangeType ct)
     if (ct != ChangeType::ROTATE)
         __setMoveZhStrAndNums();
     for (auto& move : prevMoves)
-        done(move);
+        __done(move);
 }
 
 void ChessManual::read(const string& infilename)
@@ -344,7 +339,7 @@ const wstring ChessManual::toString()
     __writeMove_PGN_CC(wos);
 
     /*
-    backTo(rootMove_);
+    __backTo(rootMove_);
     vector<SMove> preMoves{};
     function<void(bool)>
         __printMoveBoard = [&](bool isOther) {
@@ -355,8 +350,8 @@ const wstring ChessManual::toString()
                 __printMoveBoard(true);
                 // 变着之前着在返回时，应予执行
                 if (!preMoves.empty()) {
-                    //preMoves.back()->done();
-                    done(preMoves.back());
+                    //preMoves.back()->__done();
+                    __done(preMoves.back());
                     preMoves.pop_back();
                 }
             }
@@ -369,6 +364,22 @@ const wstring ChessManual::toString()
         __printMoveBoard(false);
     //*/
     return wos.str();
+}
+
+void ChessManual::__backTo(const SMove& move)
+{
+    while (currentMove_ != rootMove_ && currentMove_ != move)
+        back();
+}
+
+void ChessManual::__done(const SMove& move)
+{
+    move->setEatPie(board_->doneMove(move->getPRowCol_pair()));
+}
+
+void ChessManual::__undo(const SMove& move)
+{
+    board_->undoMove(move->getPRowCol_pair(), move->eatPie());
 }
 
 void ChessManual::__setFENplusFromFEN(const wstring& FEN, PieceColor color)
@@ -406,10 +417,10 @@ void ChessManual::__setMoveZhStrAndNums()
             move->setZhStr(board_->getZHStr(move->getPRowCol_pair()));
 
             //wcout << move->zh() << L'\n' << board_->toString() << L'\n' << endl;
-            done(move);
+            __done(move);
             if (move->next())
                 __setZhStrAndNums(move->next());
-            undo(move);
+            __undo(move);
 
             if (move->other()) {
                 ++maxCol_;
@@ -797,12 +808,12 @@ void ChessManual::__readMove_PGN_ICCSZH(wistream& wis, RecFormat fmt)
         if ((*wtiMove)[1].matched) {
             preOtherMoves.push_back(preMove);
             if (isPGN_ZH)
-                undo(preMove);
+                __undo(preMove);
             move = addOtherMove(preMove, (*wtiMove)[3], fmt, (*wtiMove)[4]);
         } else
             move = addNextMove(preMove, (*wtiMove)[3], fmt, (*wtiMove)[4]);
         if (isPGN_ZH)
-            done(move); // 推进board的状态变化
+            __done(move); // 推进board的状态变化
 
         if ((*wtiMove)[5].matched)
             for (int num = (*wtiMove).length(5); num > 0; --num) {
@@ -810,9 +821,9 @@ void ChessManual::__readMove_PGN_ICCSZH(wistream& wis, RecFormat fmt)
                 preOtherMoves.pop_back();
                 if (isPGN_ZH) {
                     do {
-                        undo(move);
+                        __undo(move);
                     } while ((move = move->prev()) != preMove);
-                    done(preMove);
+                    __done(preMove);
                 }
             }
         else
@@ -820,7 +831,7 @@ void ChessManual::__readMove_PGN_ICCSZH(wistream& wis, RecFormat fmt)
     }
     if (isPGN_ZH)
         while (move != rootMove_) {
-            undo(move);
+            __undo(move);
             move = move->prev();
         }
 }
@@ -904,9 +915,9 @@ void ChessManual::__readMove_PGN_CC(wistream& wis)
                 }
                 if (int(moveLines.size()) - 1 > row
                     && moveLines[row + 1][col][0] != L'　') {
-                    done(newMove);
+                    __done(newMove);
                     __readMove(newMove, false, row + 1, col);
-                    undo(newMove);
+                    __undo(newMove);
                 }
             }
         };

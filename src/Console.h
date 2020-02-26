@@ -58,9 +58,9 @@ private:
     void __operateWin();
 
     bool __operateMenu(const KEY_EVENT_RECORD& ker);
-    void __operateBoard(WORD key);
-    void __operateMove(WORD key);
-    void __operateCurMove(WORD key);
+    void __operateBoard(const KEY_EVENT_RECORD& ker);
+    void __operateMove(const KEY_EVENT_RECORD& ker);
+    void __operateCurMove(const KEY_EVENT_RECORD& ker);
 
     void __writeAreas();
 

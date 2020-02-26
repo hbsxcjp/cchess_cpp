@@ -8,7 +8,7 @@ static constexpr int CHARSSIZE = 1024;
 static DWORD rwNum; // 公用变量
 static constexpr wchar_t PROGRAMNAME[] = L"中国象棋 ";
 
-static constexpr SHORT WINROWS = 47, WINCOLS = 130;
+static constexpr SHORT WINROWS = 50, WINCOLS = 150;
 static constexpr COORD HOMEPOS = { 0, 0 };
 static constexpr SHORT BOARDROWS = 10 + 9, BOARDCOLS = (9 + 8) * 2, BOARDTITLEH = 2;
 static constexpr SHORT SHADOWCOLS = 2, SHADOWROWS = 1, BORDERCOLS = 2, BORDERROWS = 1;
@@ -61,6 +61,8 @@ static constexpr WORD SHADOWATTR[] = { 0x08, 0x82 };
 
 static constexpr WORD ShowMenuAttr[] = { 0x80, 0x4F };
 static constexpr WORD SelMenuAttr[] = { 0x10, 0x2F };
+static constexpr WORD SelMoveAttr[] = { 0x07, 0xF1 };
+
 static constexpr WORD RedSideAttr[] = { 0x0C | (BOARDATTR[0] & 0xF0), 0x0C | (BOARDATTR[1] & 0xF0) };
 static constexpr WORD BlackSideAttr[] = { 0x00 | (BOARDATTR[0] & 0xF0), 0x00 | (BOARDATTR[1] & 0xF0) };
 static constexpr WORD CurmoveAttr[] = { 0x0C | (CURMOVEATTR[0] & 0xF0), 0x0C | (CURMOVEATTR[1] & 0xF0) };
@@ -154,13 +156,13 @@ void Console::__operateWin()
             return;
         switch (area_) { // 区分不同区域, 进行操作
         case MOVEA:
-            __operateMove(key);
+            __operateMove(ker);
             break;
         case CURMOVEA:
-            __operateCurMove(key);
+            __operateCurMove(ker);
             break;
         case BOARDA:
-            __operateBoard(key);
+            __operateBoard(ker);
             break;
         case MENUA:
             if (__operateMenu(ker))
@@ -195,7 +197,7 @@ void Console::__operateWin()
                 break;
             }
             if (ker.bKeyDown)
-                __writeStatus();
+                __writeAreas();
         }
     }
 }
@@ -219,7 +221,7 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
 
     // 同组菜单第n个
     auto __getLevelTopMenu = [&](Menu* menu, int level) {
-        menu = __getTopMenu(menu);
+        //menu = __getTopMenu(menu);
         while (level-- > 0 && menu->childMenu != nullptr)
             menu = menu->childMenu;
         return menu;
@@ -232,7 +234,7 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
         return menu;
     };
 
-    bool selected{ false };
+    bool isExitMenu{ false };
     switch (ker.wVirtualKeyCode) {
     case 'F':
         curMenu_ = __getTopIndexMenu()->childMenu;
@@ -255,7 +257,7 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
             curMenu_ = __getTopMenu(curMenu_);
         break;
     case VK_UP:
-        if (curMenu_ != __getTopMenu(curMenu_))
+        if (curMenu_->childIndex > 0)
             curMenu_ = curMenu_->preMenu;
         else
             curMenu_ = __getBottomMenu(curMenu_);
@@ -267,14 +269,11 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
         curMenu_ = __getBottomMenu(curMenu_);
         break;
     case VK_LEFT:
-        if (curMenu_->childIndex == 0) { // 顶层菜单
-            if (curMenu_->preMenu != rootMenu_)
-                curMenu_ = curMenu_->preMenu;
-            else
-                curMenu_ = __getTopIndexMenu(3);
-        } else {
+        if (curMenu_->childIndex == 0) // 顶层菜单
+            curMenu_ = __getTopIndexMenu((curMenu_->brotherIndex - 1 + 4) % 4);
+        else {
             auto tmenu = __getTopMenu(curMenu_);
-            if (tmenu->preMenu->brotherIndex > 0) // 向左
+            if (tmenu->brotherIndex > 0) // 向左
                 tmenu = tmenu->preMenu;
             else
                 tmenu = __getTopIndexMenu(3);
@@ -282,12 +281,9 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
         }
         break;
     case VK_RIGHT:
-        if (curMenu_->childIndex == 0) { // 顶层菜单
-            if (curMenu_->brotherMenu != nullptr)
-                curMenu_ = curMenu_->brotherMenu;
-            else
-                curMenu_ = __getTopIndexMenu();
-        } else {
+        if (curMenu_->childIndex == 0) // 顶层菜单
+            curMenu_ = __getTopIndexMenu((curMenu_->brotherIndex + 1 + 4) % 4);
+        else {
             auto tmenu = __getTopMenu(curMenu_);
             if (tmenu->brotherMenu != nullptr) // 向右
                 tmenu = tmenu->brotherMenu;
@@ -298,9 +294,10 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
         break;
     case VK_RETURN:
     case VK_ESCAPE:
-        selected = true;
+        isExitMenu = true;
         break;
     default:
+        isExitMenu = true;
         //curMenu_ = __getTopIndexMenu();
         break;
     }
@@ -336,7 +333,7 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
     };
 
     if (curMenu_ == nullptr || curMenu_ == rootMenu_)
-        return selected;
+        return isExitMenu;
     SHORT level = curMenu_->childIndex;
     SHORT posL = __getPosL(curMenu_) + SHADOWCOLS,
           posT = iMenuRect.Bottom + (level == 0 ? 0 : 1),
@@ -346,7 +343,7 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
     SMALL_RECT rect = { posL, posT, posR, posB };
 
     __cleanSubMenuArea();
-    if (!selected) {
+    if (!isExitMenu) {
         if (level > 0) {
             //__cleanArea(ShowMenuAttr[thema_], rect);
             __initArea(ShowMenuAttr[thema_], rect, false);
@@ -355,14 +352,40 @@ bool Console::__operateMenu(const KEY_EVENT_RECORD& ker)
         __cleanAreaAttr(SelMenuAttr[thema_], SMALL_RECT{ rect.Left, level, SHORT(rect.Right - SHADOWCOLS), level }); // 位置在clean之后
         __writeStatus();
     }
-    return selected;
+    return isExitMenu;
 }
 
-void Console::__operateBoard(WORD key) {}
+void Console::__operateBoard(const KEY_EVENT_RECORD& ker) {}
 
-void Console::__operateMove(WORD key) {}
+void Console::__operateMove(const KEY_EVENT_RECORD& ker)
+{
+    switch (ker.wVirtualKeyCode) {
+    case VK_DOWN:
+        cm_->go();
+        break;
+    case VK_UP:
+    case VK_LEFT:
+        cm_->back();
+        break;
+    case VK_HOME:
+        cm_->backFirst();
+        break;
+    case VK_END:
+        cm_->goEnd();
+        break;
+    case VK_RIGHT:
+        cm_->goOther();
+        break;
+    case VK_RETURN:
+        area_ = CURMOVEA;
+        break;
+    default:
+        cout << ker.wVirtualKeyCode << '/';
+        break;
+    }
+}
 
-void Console::__operateCurMove(WORD key) {}
+void Console::__operateCurMove(const KEY_EVENT_RECORD& ker) {}
 
 void Console::__writeAreas()
 {
@@ -406,6 +429,9 @@ void Console::__writeCurmove()
 void Console::__writeMove()
 {
     __writeAreaLineChars(MOVEATTR[thema_], cm_->getMoveStr().c_str(), iMoveRect, mFirstRow_, mFirstCol_);
+    auto curCoord = cm_->getMoveCoord();
+    COORD showCoord = { SHORT(iMoveRect.Left + curCoord.first * 5 * 2), SHORT(iMoveRect.Top + curCoord.second * 2) };
+    FillConsoleOutputAttribute(hOut_, SelMoveAttr[thema_], 4 * 2, showCoord, &rwNum);
 }
 
 void Console::__writeStatus()
@@ -416,7 +442,7 @@ void Console::__writeStatus()
         wos << L"【着法】";
         break;
     case CURMOVEA:
-        wos << L"【详解】";
+        wos << L"【详解】颜色属性由两个十六进制数字指定 -- 第一个对应于背景，第二个对应于前景。每个数字可以为以下任何值: 0 = 黑色 8 = 灰色 1 = 蓝色 9 = 淡蓝色 2 = 绿色 A = 淡绿色 3 = 浅绿色 B = 淡浅绿色 4 = 红色 C = 淡红色 5 = 紫色 D = 淡紫色 6 = 黄色 E = 淡黄色 7 = 白色 F = 亮白色 ";
         break;
     case BOARDA:
         wos << L"【棋盘】";
@@ -456,6 +482,8 @@ void Console::__writeAreaLineChars(WORD attr, const wchar_t* lineChars, const SM
         if (wch == L'\n')
             ++srcIndex; // 消除换行符
         lineChars += srcIndex;
+        if ((cols - showCols) % 2 == 1)
+            tempLineChar[desIndex++] = L'.'; // 对齐中文
         tempLineChar[desIndex] = L'\x0';
         return desIndex;
     };
